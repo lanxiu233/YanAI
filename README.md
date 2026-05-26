@@ -96,7 +96,7 @@ environment:
 ### 在线画图功能
 
 - 内置「画图」工作台，支持文生图、图生图和多参考图编辑
-- 提供眼镜搭配、发型报告、自然美颜、照片增强、暗光修复、高清细节修复等预设提示词
+- 提供眼镜搭配、发型报告、自然美颜、写真随机风格、照片增强、暗光修复、高清细节修复等预设提示词
 - 支持参考图上传、粘贴图片、图片比例选择和多张任务队列
 - 本地保存图片会话历史，支持回看、删除、清空和从结果图继续编辑
 - 服务端可缓存生成图片，并在「图片管理 / 我的图片」中按日期筛选、预览和复制地址
@@ -339,6 +339,8 @@ curl http://localhost:8000/v1/responses \
 ## 致谢
 
 感谢 [basketikun/chatgpt2api](https://github.com/basketikun/chatgpt2api) 项目在 ChatGPT 官网能力逆向整理、OpenAI 兼容接口封装和自托管部署思路上的探索与开源分享。颜AI 的项目方向与部分实现思路受其启发。
+感谢 [L站佬友提供的提示词](https://linux.do/t/topic/532495)
+感谢 [glidea/banana-prompt-quicker](https://github.com/glidea/banana-prompt-quicker) 项目在提示词快捷工作流上的开源分享与启发。
 
 ## Contributors
 

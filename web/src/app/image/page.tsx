@@ -22,6 +22,7 @@ import { useAuthGuard } from "@/lib/use-auth-guard";
 import {
   clearImageConversations,
   deleteImageConversation,
+  getImageConversationOwnerKey,
   getImageConversationStats,
   listImageConversations,
   saveImageConversation,
@@ -33,10 +34,15 @@ import {
   type StoredImage,
   type StoredReferenceImage,
 } from "@/store/image-conversations";
+import type { StoredAuthSession } from "@/store/auth";
 
 const ACTIVE_CONVERSATION_STORAGE_KEY = "chatgpt2api:image_active_conversation_id";
 const IMAGE_SIZE_STORAGE_KEY = "chatgpt2api:image_last_size";
 const activeConversationQueueIds = new Set<string>();
+
+function getScopedStorageKey(baseKey: string, ownerKey: string) {
+  return ownerKey ? `${baseKey}:${ownerKey}` : baseKey;
+}
 
 function buildConversationTitle(prompt: string) {
   const trimmed = prompt.trim();
@@ -114,7 +120,7 @@ function sortImageConversations(conversations: ImageConversation[]) {
   return [...conversations].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
 
-async function recoverConversationHistory(items: ImageConversation[]) {
+async function recoverConversationHistory(items: ImageConversation[], ownerKey: string) {
   const normalized = items.map((conversation) => {
     let changed = false;
 
@@ -168,13 +174,13 @@ async function recoverConversationHistory(items: ImageConversation[]) {
 
   const changedConversations = normalized.filter((conversation, index) => conversation !== items[index]);
   if (changedConversations.length > 0) {
-    await saveImageConversations(normalized);
+    await saveImageConversations(normalized, ownerKey);
   }
 
   return normalized;
 }
 
-function ImagePageContent({ isAdmin }: { isAdmin: boolean }) {
+function ImagePageContent({ session }: { session: StoredAuthSession }) {
   const didLoadQuotaRef = useRef(false);
   const conversationsRef = useRef<ImageConversation[]>([]);
   const resultsViewportRef = useRef<HTMLDivElement>(null);
@@ -197,6 +203,16 @@ function ImagePageContent({ isAdmin }: { isAdmin: boolean }) {
   const [lightboxIndex, setLightboxIndex] = useState(0);
   const [deleteConfirm, setDeleteConfirm] = useState<{ type: "one"; id: string } | { type: "all" } | null>(null);
 
+  const isAdmin = session.role === "admin";
+  const imageConversationOwnerKey = useMemo(() => getImageConversationOwnerKey(session), [session]);
+  const activeConversationStorageKey = useMemo(
+    () => getScopedStorageKey(ACTIVE_CONVERSATION_STORAGE_KEY, imageConversationOwnerKey),
+    [imageConversationOwnerKey],
+  );
+  const imageSizeStorageKey = useMemo(
+    () => getScopedStorageKey(IMAGE_SIZE_STORAGE_KEY, imageConversationOwnerKey),
+    [imageConversationOwnerKey],
+  );
   const parsedCount = useMemo(() => Math.max(1, Math.min(10, Number(imageCount) || 1)), [imageCount]);
   const selectedConversation = useMemo(
     () => conversations.find((item) => item.id === selectedConversationId) ?? null,
@@ -226,12 +242,17 @@ function ImagePageContent({ isAdmin }: { isAdmin: boolean }) {
     let cancelled = false;
 
     const loadHistory = async () => {
+      conversationsRef.current = [];
+      setIsLoadingHistory(true);
+      setConversations([]);
+      setSelectedConversationId(null);
+
       try {
-        const storedSize = typeof window !== "undefined" ? window.localStorage.getItem(IMAGE_SIZE_STORAGE_KEY) : null;
+        const storedSize = typeof window !== "undefined" ? window.localStorage.getItem(imageSizeStorageKey) : null;
         setImageSize(storedSize || "");
 
-        const items = await listImageConversations();
-        const normalizedItems = await recoverConversationHistory(items);
+        const items = await listImageConversations(imageConversationOwnerKey);
+        const normalizedItems = await recoverConversationHistory(items, imageConversationOwnerKey);
         if (cancelled) {
           return;
         }
@@ -239,7 +260,7 @@ function ImagePageContent({ isAdmin }: { isAdmin: boolean }) {
         conversationsRef.current = normalizedItems;
         setConversations(normalizedItems);
         const storedConversationId =
-          typeof window !== "undefined" ? window.localStorage.getItem(ACTIVE_CONVERSATION_STORAGE_KEY) : null;
+          typeof window !== "undefined" ? window.localStorage.getItem(activeConversationStorageKey) : null;
         const nextSelectedConversationId =
           (storedConversationId && normalizedItems.some((conversation) => conversation.id === storedConversationId)
             ? storedConversationId
@@ -259,7 +280,7 @@ function ImagePageContent({ isAdmin }: { isAdmin: boolean }) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [activeConversationStorageKey, imageConversationOwnerKey, imageSizeStorageKey]);
 
   const loadQuota = useCallback(async () => {
     if (!isAdmin) {
@@ -311,29 +332,38 @@ function ImagePageContent({ isAdmin }: { isAdmin: boolean }) {
     if (typeof window === "undefined") {
       return;
     }
+    if (isLoadingHistory) {
+      return;
+    }
 
     if (selectedConversationId) {
-      window.localStorage.setItem(ACTIVE_CONVERSATION_STORAGE_KEY, selectedConversationId);
+      window.localStorage.setItem(activeConversationStorageKey, selectedConversationId);
     } else {
-      window.localStorage.removeItem(ACTIVE_CONVERSATION_STORAGE_KEY);
+      window.localStorage.removeItem(activeConversationStorageKey);
     }
-  }, [selectedConversationId]);
+  }, [activeConversationStorageKey, isLoadingHistory, selectedConversationId]);
 
   useEffect(() => {
     if (typeof window === "undefined") {
       return;
     }
-
-    if (imageSize) {
-      window.localStorage.setItem(IMAGE_SIZE_STORAGE_KEY, imageSize);
+    if (isLoadingHistory) {
       return;
     }
-    window.localStorage.removeItem(IMAGE_SIZE_STORAGE_KEY);
-  }, [imageSize]);
+
+    if (imageSize) {
+      window.localStorage.setItem(imageSizeStorageKey, imageSize);
+      return;
+    }
+    window.localStorage.removeItem(imageSizeStorageKey);
+  }, [imageSize, imageSizeStorageKey, isLoadingHistory]);
 
   useEffect(() => {
     if (selectedConversationId && !conversations.some((conversation) => conversation.id === selectedConversationId)) {
-      setSelectedConversationId(pickFallbackConversationId(conversations));
+      const timeout = window.setTimeout(() => {
+        setSelectedConversationId(pickFallbackConversationId(conversations));
+      }, 0);
+      return () => window.clearTimeout(timeout);
     }
   }, [conversations, selectedConversationId]);
 
@@ -344,7 +374,7 @@ function ImagePageContent({ isAdmin }: { isAdmin: boolean }) {
     ]);
     conversationsRef.current = nextConversations;
     setConversations(nextConversations);
-    await saveImageConversation(conversation);
+    await saveImageConversation(conversation, imageConversationOwnerKey);
   };
 
   const updateConversation = useCallback(
@@ -362,10 +392,10 @@ function ImagePageContent({ isAdmin }: { isAdmin: boolean }) {
       conversationsRef.current = nextConversations;
       setConversations(nextConversations);
       if (options.persist !== false) {
-        await saveImageConversation(nextConversation);
+        await saveImageConversation(nextConversation, imageConversationOwnerKey);
       }
     },
-    [],
+    [imageConversationOwnerKey],
   );
 
   const clearComposerInputs = useCallback(() => {
@@ -399,11 +429,11 @@ function ImagePageContent({ isAdmin }: { isAdmin: boolean }) {
     }
 
     try {
-      await deleteImageConversation(id);
+      await deleteImageConversation(id, imageConversationOwnerKey);
     } catch (error) {
       const message = error instanceof Error ? error.message : "删除会话失败";
       toast.error(message);
-      const items = await listImageConversations();
+      const items = await listImageConversations(imageConversationOwnerKey);
       conversationsRef.current = items;
       setConversations(items);
     }
@@ -411,7 +441,7 @@ function ImagePageContent({ isAdmin }: { isAdmin: boolean }) {
 
   const handleClearHistory = async () => {
     try {
-      await clearImageConversations();
+      await clearImageConversations(imageConversationOwnerKey);
       conversationsRef.current = [];
       setConversations([]);
       setSelectedConversationId(null);
@@ -531,7 +561,8 @@ function ImagePageContent({ isAdmin }: { isAdmin: boolean }) {
   /* eslint-disable react-hooks/preserve-manual-memoization */
   const runConversationQueue = useCallback(
     async (conversationId: string) => {
-      if (activeConversationQueueIds.has(conversationId)) {
+      const queueId = `${imageConversationOwnerKey}:${conversationId}`;
+      if (activeConversationQueueIds.has(queueId)) {
         return;
       }
 
@@ -541,7 +572,7 @@ function ImagePageContent({ isAdmin }: { isAdmin: boolean }) {
         return;
       }
 
-      activeConversationQueueIds.add(conversationId);
+      activeConversationQueueIds.add(queueId);
       await updateConversation(conversationId, (current) => {
         const conversation = current ?? snapshot;
         return {
@@ -713,10 +744,11 @@ function ImagePageContent({ isAdmin }: { isAdmin: boolean }) {
         });
         toast.error(message);
       } finally {
-        activeConversationQueueIds.delete(conversationId);
+        activeConversationQueueIds.delete(queueId);
         for (const conversation of conversationsRef.current) {
+          const nextQueueId = `${imageConversationOwnerKey}:${conversation.id}`;
           if (
-            !activeConversationQueueIds.has(conversation.id) &&
+            !activeConversationQueueIds.has(nextQueueId) &&
             conversation.turns.some((turn) => turn.status === "queued")
           ) {
             void runConversationQueue(conversation.id);
@@ -724,20 +756,20 @@ function ImagePageContent({ isAdmin }: { isAdmin: boolean }) {
         }
       }
     },
-    [loadQuota, updateConversation],
+    [imageConversationOwnerKey, loadQuota, updateConversation],
   );
   /* eslint-enable react-hooks/preserve-manual-memoization */
 
   useEffect(() => {
     for (const conversation of conversations) {
       if (
-        !activeConversationQueueIds.has(conversation.id) &&
+        !activeConversationQueueIds.has(`${imageConversationOwnerKey}:${conversation.id}`) &&
         conversation.turns.some((turn) => turn.status === "queued")
       ) {
         void runConversationQueue(conversation.id);
       }
     }
-  }, [conversations, runConversationQueue]);
+  }, [conversations, imageConversationOwnerKey, runConversationQueue]);
 
   const handleSubmit = async () => {
     const prompt = imagePrompt.trim();
@@ -776,11 +808,13 @@ function ImagePageContent({ isAdmin }: { isAdmin: boolean }) {
     const baseConversation: ImageConversation = targetConversation
       ? {
           ...targetConversation,
+          ownerKey: imageConversationOwnerKey,
           updatedAt: now,
           turns: [...targetConversation.turns, draftTurn],
         }
       : {
           id: conversationId,
+          ownerKey: imageConversationOwnerKey,
           title: buildConversationTitle(prompt),
           createdAt: now,
           updatedAt: now,
@@ -953,5 +987,5 @@ export default function ImagePage() {
     );
   }
 
-  return <ImagePageContent isAdmin={session.role === "admin"} />;
+  return <ImagePageContent session={session} />;
 }

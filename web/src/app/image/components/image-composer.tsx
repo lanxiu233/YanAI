@@ -1,12 +1,17 @@
 "use client";
 import {
   ArrowUp,
+  Aperture,
+  Box,
   Camera,
   Check,
   ChevronDown,
+  Clapperboard,
   Glasses,
   ImagePlus,
   LoaderCircle,
+  Newspaper,
+  NotebookPen,
   Scissors,
   Sparkles,
   SunMedium,
@@ -161,6 +166,213 @@ const DETAIL_RESTORE_PROMPT = `
 输出效果：真实高清修复、自然锐化、细节增强、同一张照片更清楚。彻底避免：换脸、五官重绘、假毛孔、过度锐化光晕、AI插画感、塑料皮肤、过度降噪涂抹。
 `.trim();
 
+const PHOTO_PORTRAIT_V1_PROMPT = `
+# 角色设定（Role Definition）
+你是一位资深的视觉艺术家与摄影风格提示词专家，对现代主流审美趋势有敏锐的洞察力。你精通摄影构图、光影运用、氛围营造和人像美学，能够将复杂的视觉概念转化为精准、生动且富有吸引力的文本描述，专门用于指导AI图像生成模型。
+
+# 任务描述（Task Specification）
+你的任务是根据一系列预设的、符合大众审美的摄影风格元素，随机组合并生成一条高质量、风格鲜明、让人眼前一亮的真人写真风格AI绘画提示词。
+
+# 任务步骤（Task Steps）
+1.  **随机选择一个核心摄影风格**：从以下列表中随机选择一种作为基础风格：
+    * 细腻皮肤真实质感风
+    * 日常快照抓拍风
+    * 高级感时尚人像风
+    * 日系清新氛围风
+    * 电影感光影故事风
+    * 水润通透感写真
+
+2.  **随机确定主体与构图**：随机选择一个主体、一个机位角度和一个景别：
+    * **主体**: 少女, 年轻女性, 情侣
+    * **机位角度**: 俯视, 仰视, 平视, 侧面
+    * **景别**: 脸部特写, 半身肖像, 全身
+
+3.  **随机设定场景与光线**：随机选择一个场景和一个光线类型，确保二者搭配合理：
+    * **场景**: 阳光明媚的室外, 简约干净的室内, 夜晚的城市街道, 咖啡馆窗边, 海边, 艺术展厅, 隔着有水汽的玻璃
+    * **光线**: 自然柔和的阳光, 戏剧性的侧光勾勒轮廓, 昏暗环境中的一束聚光, 水波反射的晃动光斑, 闪光灯直射的快照感
+
+4.  **随机添加氛围与细节**：随机选择2-3个能增强画面故事性和动态感的细节：
+    * **情绪/神态**: 自然松弛, 眼神直视镜头, 高冷魅惑, 温柔低垂, 忧郁安静
+    * **动态细节**: 头发被微风吹动, 发丝湿漉漉地贴在脸颊, 手指与环境/物体互动, 画面有动态模糊或轻微晃动感
+    * **质感/特效**: 胶片颗粒感, 镜头噪点, 漂浮的粒子, 皮肤上的水珠或微光
+
+5.  **随机确定画面比例**：从以下常用比例中随机选择一个：
+    * 3:4
+    * 4:3
+    * 9:16
+    * 16:9
+
+6.  **组合并润色**：将以上步骤选择的元素有机地组合成一段通顺、生动、描述性强的提示词文本。确保语言表达流畅，能够激发创作灵感。
+
+7.  **添加强制性结尾**：在生成提示词的末尾，必须一字不差地加上固定后缀。
+
+# 约束条件（Constraints）
+1.  生成的风格必须是大众容易接受的真人写真风格，严禁生成二次元、油画、赛博朋克、哥特等小众或非写实艺术风格。
+2.  生成的内容必须健康、积极，不包含任何敏感或不适宜的信息。
+3.  最终输出的必须是完整的一段提示词，不能分点或分段。
+4.  必须在提示词的末尾添加：“【不改变人脸比例和形象，保留人物原貌，原比例！原比例！原比例！】”。这是强制要求，必须包含。
+5.  每次生成的提示词都应具有独特性和随机性，避免重复。
+
+# 响应格式（Response Format）
+直接输出最终生成的摄影风格提示词文本，不要包含任何额外的前言、标题、解释或说明。
+
+# 示例和指导（Examples and Guidance）
+* **高质量范例1 (细腻质感风):** 采用细腻皮肤真实质感的风格，画面中展现了一个少女的脸部特写，通过略微俯视的镜头角度进行呈现。背景营造出清醒系且阳光的场景氛围，少女有着散乱的头发随风飘动，眼神闪闪发光，其中带着阳光和魅惑的情绪，尽显高冷气质。画面着重勾勒了少女的面部细节，高光处理十分讲究，同时画面呈现出带有摄影机噪点的画质，并且有着蓝白色通透效果。比例3:4。【不改变人脸比例和形象，原比例！原比例！原比例！】
+* **高质量范例2 (时尚人像风):** 水后时尚人像，面部大特写，极近距离拍摄，眼神直视镜头，神态自然松弛，清透水感妆容。人物和数尾迷你热带小鱼在鱼缸前景缓缓穿梭，尾鳍透明灵动。水面折射出晃动光纹，碎光斑点在脸庞跳跃，水下漂浮粒子环绕。整体氛围梦幻安静，棕黑色系暗调，高级感浓厚，漂浮失焦、动态模糊与细腻胶片颗粒交错。比例9:16。【不改变人脸比例和形象，原比例！原比例！原比例！】
+* **高质量范例3 (快照抓拍风):** 看起来像用拍立得相机偶然拍到的漫不经心的情侣快照。照片要有轻微的晃动感，暗处照相机闪光灯发出的照明扩散到整个照片上。男生女生脸贴脸亲密地看着镜头，前置摄像头的自拍视角。照片不能太清晰，要有胶片拍立得的质感。比例4:3。【不改变人脸比例和形象，原比例！原比例！原比例！】
+`.trim();
+
+const PHOTO_PORTRAIT_V2_PROMPT = `
+# 角色设定（Role Definition）
+你是一位顶尖的商业摄影师与视觉艺术家，拥有敏锐的时尚洞察力和丰富的人像摄影经验。你擅长捕捉人物的真实情感与状态，并能创造出既符合大众审美又具有独特风格的视觉作品。你精通光影、构图、色彩和质感的运用，能够将抽象的氛围和情绪转化为具体的、可执行的摄影风格描述。
+# 任务描述（Task Specification）
+你的任务是根据用户的需求，随机创造出多种独特、鲜明、且易于被大众接受的真人写真摄影风格。这些风格描述将作为AI绘画的提示词，需要足够详细、具体、富有画面感，能够引导AI生成高质量、令人眼前一亮的摄影作品。
+# 任务步骤（Task Steps）
+构思核心场景/情绪 (Core Scene/Emotion)：首先，随机选择一个生活化的场景或一种特定的情绪作为风格的基石。例如：“清晨窗边的慵懒”、“都市夜游的疏离感”、“夏日午后的宁静”、“与宠物互动的温馨一刻”。
+确定摄影基调 (Photographic Tone)：从以下主流摄影类型中随机选择一种或两种进行融合，作为整体风格的基调：
+日系清新风 (Japanese Fresh Style)：特点是高明度、低饱和度、柔和的光线、干净的画面。
+随性抓拍风 (Candid Snapshot Style)：模仿不经意间拍下的瞬间，带有轻微的动态模糊、不完美的构图、真实的生活气息。
+时尚杂志风 (Fashion Editorial Style)：强调高级感、清晰的面部轮廓、精致的妆容、富有表现力的姿势和眼神。
+电影故事感 (Cinematic Style)：通过特殊的光影（如伦勃朗光、霓虹光）、环境叙事和人物情绪，营造出仿佛电影截图般的氛围。
+设计光影与色彩 (Lighting & Color)：随机组合光线类型、方向和色彩方案，这是风格的灵魂。
+光线类型：柔和的散射光、硬朗的直射光、傍晚的黄金一小时光、透过百叶窗的光束、水面的反射光等。
+色彩方案：整体偏向某种色调（如冷调蓝白、暖调橘棕、低饱和度的莫兰迪色系），并决定对比度的高低。
+设定构图与视角 (Composition & Angle)：随机选择一种构图方式来突出主体。
+视角：正面、侧面、45度角、俯拍、仰拍。
+景别：面部特写、半身像、全身像。
+构图：中心构图、三分法构图、引导线构图。
+描绘质感与细节 (Texture & Details)：为画面增加决定性的细节和质感，使其与众不同。
+皮肤质感：细腻通透的、带有微汗水光的、有雀斑的自然皮肤。
+环境/道具细节：空气中的微尘、镜头上的光晕、湿润发丝的细节、衣服的褶皱。
+后期质感：添加轻微的胶片颗粒、锐化或柔焦效果。
+整合并输出：将以上步骤中随机选择的元素有机地组合成一段通顺、生动、富有感染力的文字描述。确保语言精炼，关键词明确，便于AI理解和执行。
+# 约束条件（Constraints）
+生成的风格必须是“真人写真”风格，避免生成任何形式的动漫、插画或3D渲染风格。
+风格必须新颖且符合大众审美，避免使用过于小众、怪异或已经被滥用的固定风格模板（例如，赛博朋克、哥特幻想、蒸汽朋克等）。
+描述应聚焦于氛围、光影、质感、色彩和构图，而不是具体的服装或人物身份。
+最终输出的风格描述应是一段完整的文本，不包含步骤拆解或任何额外的解释性文字。
+生成的每一种风格都应有其独特的记忆点，避免与其他风格高度雷同。
+# 响应格式（Response Format）
+直接输出最终生成的摄影风格文字描述，将整段描述包裹在一个代码块中。
+# 示例和指导（Examples and Guidance）
+示例1 (日系清新 + 随性抓拍):
+日系空气感抓拍风格。在一个洒满午后阳光的房间里，采用略微过曝的曝光，营造轻盈通透的氛围。人物侧对镜头，视线望向窗外，仿佛被某物吸引的瞬间被捕捉下来。光线穿过轻薄的白色窗帘，在人物脸上形成柔和的光斑，发丝边缘呈现出金色的轮廓光。画面整体色调偏向淡雅的青蓝色，饱和度较低，强调皮肤的白皙通透感。带有轻微的镜头光晕和空气中的粉尘感，呈现出一种不经意的、温暖而恬静的美。
+示例2 (时尚杂志 + 电影故事感):
+暗调情绪时尚人像风格。主体位于画面一侧，采用大光圈拍摄，背景被虚化成模糊的光斑。一束精准的戏剧性顶光从斜上方打下，仅照亮人物的半边脸、肩膀和手臂，形成强烈的光影对比（契亚拉斯库罗光影法）。面部表情冷静而疏离，眼神直视镜头，充满故事感。环境色调为浓郁的墨绿或深蓝色，皮肤在暗调背景的映衬下质感细腻，高光部分清晰锐利。画面带有细腻的电影胶片颗粒，营造出一种高级、神秘且宁静的氛围。
+`.trim();
+
+const CUTIE_3D_STYLE_PROMPT = `
+请将主体生成或重绘为 cutie style 的极简 3D 插画。用户可以在这里补充具体主体：一个可爱、圆润、质感柔和的【主体】。
+
+{
+  "art_style_profile": {
+    "style_name": "Minimalist 3D Illustration",
+    "visual_elements": {
+      "shape_language": "Soft, rounded, chunky geometry with simplified contours and no sharp edges. Emphasis on friendly, tactile forms.",
+      "colors": {
+        "primary_palette": "Material-based natural tones (e.g., metallic silver, wooden brown, sky blue, ceramic white). When native material is vibrant, reduce saturation moderately for visual balance.",
+        "accent_colors": "Used sparingly to highlight functional or interactive parts (e.g., buttons, handles, lids) — often in warm tones like orange, amber, or rust red.",
+        "shading": "Smooth gradients with soft falloff, subtly defining form and volume without strong contrast.",
+        "supplementary_colors": "Soft neutral hues (e.g., light beige, cool gray, cream) used for secondary elements to preserve focus on the main form."
+      },
+      "lighting": {
+        "type": "Diffuse ambient light for overall clarity and soft dimensionality",
+        "source_direction": "Top-right angled light source to gently model volume",
+        "shadow_style": "Soft, elliptical shadows under object, low opacity to maintain lightness and spatial separation"
+      },
+      "materials": {
+        "surface_texture": {
+          "General": "Matte or lightly satin for a soft tactile look; minimal texture detail, but distinct material feel (e.g., metallic luster, glass clarity, wood grain hue)",
+          "Glass": "Translucent with soft internal glow and diffused refraction at edges",
+          "Metal": "Brushed or anodized look with subtle gradient highlights, no mirror reflections"
+        },
+        "reflectivity": "Low to medium depending on material — minimal gloss, no harsh highlights, always soft-edged"
+      },
+      "composition": {
+        "object_presentation": "Single object centered with generous white space around it, floating or subtly grounded",
+        "perspective": "Three-quarter top-side view to give depth and silhouette clarity",
+        "background": "Solid neutral tone (e.g., warm gray, off-white, pale sand) — unobtrusive and harmonizing with object tones"
+      },
+      "typography": {
+        "font_style": "Minimal geometric sans-serif (e.g., Inter, Helvetica Neue Light)",
+        "text_placement": "Bottom-left corner, small size",
+        "color": "Soft gray, blending subtly with the background for minimal visual interference"
+      },
+      "rendering_style": {
+        "technique": "Clean 3D render with soft ambient occlusion and simplified geometry, no texture mapping",
+        "detail_level": "Moderate — emphasizing form and color fidelity over micro-details",
+        "consistency_rule": "All elements must share the same aesthetic: smooth edges, low-contrast shadows, material-faithful coloring, and a calming visual tone"
+      }
+    },
+    "purpose": "To create clean, emotionally warm 3D visuals that feel natural yet simplified — ideal for tech, product design, lifestyle branding, and modern UI systems. It balances realism and minimalism for visual clarity and user-friendly tone."
+  }
+}
+`.trim();
+
+const XIAOHONGSHU_POSTER_PROMPT = `
+你是一个专业的视觉提示词设计助手，帮助用户生成“小红书风格”的图片提示词。请严格按照以下流程工作：
+
+第1步：先询问用户以下问题，并记录答案（中英文都可以）：
+1. 你希望海报的布局是竖直还是横向？（vertical or horizontal）
+2. 海报的主题领域是什么？比如：城市旅行、美食探索、自然风光、周末闲逛等。
+3. 你喜欢哪种拼接风格？例如：手帐风、贴纸风、杂志感、拼贴风。
+4. 边框或标签颜色你更喜欢哪种？例如：粉色、亮黄、草绿色、天蓝色。
+5. 这张图的使用时间范围是什么？例如：3.25 ~ 5.15。
+
+第2步：根据用户输入填写以下模板，并输出完整 JSON。
+- 如果布局选择 vertical 或竖直，则 "aspect_ratio" 为 "3:4"。
+- 如果布局选择 horizontal 或横向，则 "aspect_ratio" 为 "4:3"。
+- 只输出 JSON，不要输出额外解释。
+
+模板如下，请替换大括号内内容：
+
+{
+  "prompt": "A vibrant and playful collage-style poster in a {orientation} layout, themed around {content_area}, featuring a mix of photos, stickers, and hand-drawn elements. The design includes cut-out photos of relevant scenes, speech bubbles, and colorful labels with border colors in {label_color}. The style resembles social media visuals from Xiaohongshu, with a {collage_style} look. Includes both Chinese and English text, such as '城市达人计划' and 'City Guide'.",
+  "style": "{collage_style}, pastel color palette, vibrant and cheerful",
+  "elements": [
+    "speech bubbles",
+    "hand-drawn arrows",
+    "photo-style stickers (relevant to {content_area})",
+    "gradient background",
+    "Chinese and English text mixed"
+  ],
+  "color_scheme": "pastel colors (green, pink, yellow, sky blue, plus {label_color})",
+  "composition": "center-aligned main title, scattered photos with decorative borders, dynamic and asymmetrical layout",
+  "aspect_ratio": "{aspect_ratio}",
+  "additional_notes": "Designed like a Xiaohongshu (Little Red Book) campaign poster, aimed at a young, urban audience exploring {content_area} from {start_date} to {end_date}."
+}
+`.trim();
+
+const HANDWRITTEN_NOTES_PROMPT = `
+Create concise, visually structured notes on the topic "{{topic}}". Notes must fit clearly within a {{orientation}} layout (horizontal/vertical), featuring:
+
+- Moderate Font Size: Comfortable readability.
+- Clear Structure:
+  - Main points highlighted with "background colors" or "wavy underlines~".
+  - Regular notes in standard ink.
+  - Emphasis notes in a different ink color.
+- Illustrations:
+  - Include relevant sketches or hand-drawn style illustrations.
+  - Allow fountain pen-style doodles or annotations directly on illustrations.
+- Annotations:
+  - Simulate notes, corrections, and additional quirky doodles resembling spontaneous annotations, using marker pen style.
+  - Incorporate collage-style photo extracts relevant to the topic, annotated or doodled upon.
+- Language Text Accuracy Constraint (Strict):
+   - When generating text in "{{language}}", abide by recognized dictionaries and standard grammar rules.
+   - For languages like 中文 (Chinese) or others with complex scripts:
+     - Ensure each character or symbol is correct, standard, and used appropriately.
+     - Double-check stroke order, avoid non-existent variants, and verify usage before finalizing the notes.
+
+User Settings (to be defined before image generation):
+- Topic: User-defined.
+- Orientation: Horizontal or Vertical.
+- Language: English/中文 or any chosen language.
+- Color Scheme: Main notes, emphasis notes, highlight style.
+- Illustration Style: Detailed hand-drawn, minimalist sketches, or annotated magazine/photo cut-outs.
+
+Once parameters are set, generate notes in the chosen language adhering strictly to the selected formatting and visual guidelines.
+`.trim();
+
 type ImagePromptPreset = {
   id: string;
   title: string;
@@ -200,6 +412,53 @@ const promptPresetOptions: ImagePromptPreset[] = [
     mode: "edit",
     imageCount: "1",
     icon: Sparkles,
+  },
+  {
+    id: "photo-portrait-v1",
+    title: "写真随机风格 V1",
+    description: "随机组合真人写真提示词",
+    prompt: PHOTO_PORTRAIT_V1_PROMPT,
+    mode: "edit",
+    imageCount: "1",
+    icon: Aperture,
+  },
+  {
+    id: "photo-portrait-v2",
+    title: "写真随机风格 V2",
+    description: "商业摄影感真人写真描述",
+    prompt: PHOTO_PORTRAIT_V2_PROMPT,
+    mode: "edit",
+    imageCount: "1",
+    icon: Clapperboard,
+  },
+  {
+    id: "cutie-3d-style",
+    title: "3D Cutie 风格",
+    description: "圆润软萌 + 极简3D插画",
+    prompt: CUTIE_3D_STYLE_PROMPT,
+    mode: "generate",
+    imageSize: "1:1",
+    imageCount: "1",
+    icon: Box,
+  },
+  {
+    id: "xiaohongshu-poster",
+    title: "小红书风格海报",
+    description: "先问参数 + 输出海报 JSON",
+    prompt: XIAOHONGSHU_POSTER_PROMPT,
+    mode: "generate",
+    imageSize: "3:4",
+    imageCount: "1",
+    icon: Newspaper,
+  },
+  {
+    id: "handwritten-notes",
+    title: "手写笔记风格",
+    description: "结构化笔记 + 手绘批注",
+    prompt: HANDWRITTEN_NOTES_PROMPT,
+    mode: "generate",
+    imageCount: "1",
+    icon: NotebookPen,
   },
   {
     id: "photo-enhance",
