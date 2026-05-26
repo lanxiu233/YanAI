@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="720" viewBox="0 0 960 720" role="img" aria-label="产品广告示例图">
+  <defs>
+    <linearGradient id="g" x1="0" x2="1">
+      <stop stop-color="#f8fafc"/>
+      <stop offset="1" stop-color="#fee2e2"/>
+    </linearGradient>
+  </defs>
+  <rect width="960" height="720" fill="url(#g)"/>
+  <rect x="370" y="142" width="220" height="380" rx="42" fill="#111827"/>
+  <rect x="400" y="182" width="160" height="300" rx="28" fill="#f9fafb"/>
+  <circle cx="480" cy="336" r="68" fill="#fb7185"/>
+  <text x="210" y="610" fill="#111827" font-family="Arial, sans-serif" font-size="52" font-weight="800">Product Campaign</text>
+  <text x="306" y="654" fill="#64748b" font-family="Arial, sans-serif" font-size="25">clean commercial key visual</text>
+</svg>

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="720" viewBox="0 0 960 720" role="img" aria-label="城市海报艺术示例图">
+  <rect width="960" height="720" fill="#e0f2fe"/>
+  <ellipse cx="480" cy="542" rx="340" ry="82" fill="#ffffff" opacity=".9"/>
+  <path d="M214 482c95-122 195-178 302-168 106 10 187 75 244 193-194 54-376 45-546-25Z" fill="#22c55e"/>
+  <rect x="310" y="296" width="70" height="156" rx="8" fill="#0f172a"/>
+  <rect x="405" y="244" width="84" height="208" rx="8" fill="#334155"/>
+  <rect x="520" y="314" width="64" height="138" rx="8" fill="#475569"/>
+  <path d="M600 455l75-110 75 110Z" fill="#f97316"/>
+  <text x="260" y="150" fill="#0f172a" font-family="Georgia, serif" font-size="66" font-weight="700">CITY ART</text>
+  <text x="300" y="196" fill="#475569" font-family="Arial, sans-serif" font-size="25">floating island poster</text>
+</svg>

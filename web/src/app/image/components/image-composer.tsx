@@ -7,11 +7,14 @@ import {
   Check,
   ChevronDown,
   Clapperboard,
+  ExternalLink,
   Glasses,
   ImagePlus,
+  Images,
   LoaderCircle,
   Newspaper,
   NotebookPen,
+  Search,
   Scissors,
   Sparkles,
   SunMedium,
@@ -22,11 +25,20 @@ import {
 import { useEffect, useMemo, useRef, useState, type ClipboardEvent, type RefObject } from "react";
 
 import { ImageLightbox } from "@/components/image-lightbox";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Textarea } from "@/components/ui/textarea";
 import type { ImageConversationMode } from "@/store/image-conversations";
 import { cn } from "@/lib/utils";
+
+const BANANA_PROMPTS_SNAPSHOT_VERSION = "2026-05-27-full";
+const BANANA_PROMPTS_EXPECTED_COUNT = 323;
+const BANANA_PROMPTS_URL = `/banana-prompt-quicker/prompts.json?v=${BANANA_PROMPTS_SNAPSHOT_VERSION}`;
+const BANANA_PROMPTS_REPO_URL = "https://github.com/glidea/banana-prompt-quicker";
+const BANANA_PROMPTS_ASSET_BASE_URL = "/banana-prompt-quicker/";
 
 const GLASSES_PROMPT = `
 不知道自己适合佩戴什么样式的眼镜？
@@ -489,6 +501,110 @@ const promptPresetOptions: ImagePromptPreset[] = [
   },
 ];
 
+type BananaPromptItem = {
+  title: string;
+  preview?: string;
+  reference_image_urls?: string[];
+  prompt: string;
+  author?: string;
+  link?: string;
+  mode?: string;
+  category?: string;
+  sub_category?: string;
+  created?: string;
+};
+
+type BananaPromptStatus = "idle" | "loading" | "success" | "error";
+
+function normalizePromptMode(value?: string): ImageConversationMode {
+  const normalized = (value || "").toLowerCase();
+  if (["edit", "image", "image-to-image", "i2i", "图生图"].includes(normalized)) {
+    return "edit";
+  }
+  return "generate";
+}
+
+function getPromptModeLabel(value?: string) {
+  return normalizePromptMode(value) === "edit" ? "图生图" : "文生图";
+}
+
+function summarizeBananaPrompt(item: BananaPromptItem) {
+  const cleaned = item.prompt
+    .replace(/```[\s\S]*?```/g, " ")
+    .replace(/https?:\/\/\S+/g, " ")
+    .replace(/[#*_`>\-[\]{}()【】「」]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  const firstSentence =
+    cleaned
+      .split(/(?<=[。！？.!?])\s+/)
+      .find((sentence) => sentence.length >= 10)
+      ?.trim() || cleaned;
+
+  if (!firstSentence) {
+    return item.sub_category ? `${item.sub_category}类提示词，可一键填入当前输入框。` : "可一键填入当前输入框的创作提示词。";
+  }
+
+  return firstSentence.length > 86 ? `${firstSentence.slice(0, 86)}...` : firstSentence;
+}
+
+function getPromptCategoryLabel(item: BananaPromptItem) {
+  return [item.category, item.sub_category].filter(Boolean).join(" / ") || "未分类";
+}
+
+function isNsfwCategoryLabel(label: string) {
+  return label.toLowerCase().includes("nsfw");
+}
+
+function isNsfwBananaPrompt(item: BananaPromptItem) {
+  return [item.category, item.sub_category, item.title, item.prompt]
+    .filter(Boolean)
+    .some((value) => String(value).toLowerCase().includes("nsfw"));
+}
+
+function getBananaPromptPreviewUrl(item: BananaPromptItem) {
+  const candidate = item.preview || item.reference_image_urls?.[0];
+  if (!candidate) {
+    return "";
+  }
+  if (candidate.startsWith("/")) {
+    return candidate;
+  }
+
+  try {
+    const url = new URL(candidate);
+    const jsDelivrPrefix = "/gh/glidea/banana-prompt-quicker@main/";
+    if (url.hostname === "cdn.jsdelivr.net" && url.pathname.startsWith(jsDelivrPrefix)) {
+      return `${BANANA_PROMPTS_ASSET_BASE_URL}${url.pathname.slice(jsDelivrPrefix.length)}`;
+    }
+    if (url.hostname === "raw.githubusercontent.com" && url.pathname.startsWith("/glidea/banana-prompt-quicker/main/")) {
+      return `${BANANA_PROMPTS_ASSET_BASE_URL}${url.pathname.slice("/glidea/banana-prompt-quicker/main/".length)}`;
+    }
+    return candidate;
+  } catch {
+    return `${BANANA_PROMPTS_ASSET_BASE_URL}${candidate.replace(/^\.?\//, "")}`;
+  }
+}
+
+function normalizeBananaPromptsPayload(payload: unknown) {
+  const maybeItems = Array.isArray(payload)
+    ? payload
+    : payload && typeof payload === "object" && "prompts" in payload && Array.isArray((payload as { prompts: unknown }).prompts)
+      ? (payload as { prompts: unknown[] }).prompts
+      : [];
+
+  return maybeItems.filter(isBananaPromptItem);
+}
+
+function isBananaPromptItem(value: unknown): value is BananaPromptItem {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  const item = value as Partial<BananaPromptItem>;
+  return typeof item.title === "string" && typeof item.prompt === "string";
+}
+
 type ImageComposerProps = {
   mode: ImageConversationMode;
   prompt: string;
@@ -531,6 +647,13 @@ export function ImageComposer({
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
   const [isSizeMenuOpen, setIsSizeMenuOpen] = useState(false);
+  const [isPromptLibraryOpen, setIsPromptLibraryOpen] = useState(false);
+  const [bananaPromptStatus, setBananaPromptStatus] = useState<BananaPromptStatus>("idle");
+  const [bananaPromptError, setBananaPromptError] = useState("");
+  const [bananaPrompts, setBananaPrompts] = useState<BananaPromptItem[]>([]);
+  const [bananaPromptQuery, setBananaPromptQuery] = useState("");
+  const [bananaPromptCategory, setBananaPromptCategory] = useState("全部");
+  const [bananaPromptRetryKey, setBananaPromptRetryKey] = useState(0);
   const sizeMenuRef = useRef<HTMLDivElement>(null);
   const lightboxImages = useMemo(
     () => referenceImages.map((image, index) => ({ id: `${image.name}-${index}`, src: image.dataUrl })),
@@ -546,6 +669,40 @@ export function ImageComposer({
   ];
   const imageSizeLabel = imageSizeOptions.find((option) => option.value === imageSize)?.label || "未指定";
   const activePresetId = promptPresetOptions.find((preset) => preset.prompt === prompt)?.id;
+  const { regular: bananaPromptRegularCategories, nsfw: bananaPromptNsfwCategories } = useMemo(() => {
+    const categories = Array.from(new Set(bananaPrompts.map(getPromptCategoryLabel))).sort((a, b) => a.localeCompare(b, "zh-CN"));
+    return {
+      regular: ["全部", ...categories.filter((category) => !isNsfwCategoryLabel(category))],
+      nsfw: categories.filter(isNsfwCategoryLabel),
+    };
+  }, [bananaPrompts]);
+  const isNsfwCategorySelected = isNsfwCategoryLabel(bananaPromptCategory);
+  const filteredBananaPrompts = useMemo(() => {
+    const query = bananaPromptQuery.trim().toLowerCase();
+    return bananaPrompts.filter((item) => {
+      const categoryLabel = getPromptCategoryLabel(item);
+      const isNsfw = isNsfwBananaPrompt(item);
+      if (isNsfw) {
+        if (!isNsfwCategorySelected) {
+          return false;
+        }
+        const matchesNsfwCategory = bananaPromptCategory === "NSFW" || categoryLabel === bananaPromptCategory;
+        if (!matchesNsfwCategory) {
+          return false;
+        }
+      }
+      const matchesCategory = isNsfw || bananaPromptCategory === "全部" || categoryLabel === bananaPromptCategory;
+      if (!matchesCategory) {
+        return false;
+      }
+      if (!query) {
+        return true;
+      }
+      return [item.title, item.prompt, item.category, item.sub_category, item.author]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(query));
+    });
+  }, [bananaPromptCategory, bananaPromptQuery, bananaPrompts, isNsfwCategorySelected]);
 
   const handlePromptPresetSelect = (preset: ImagePromptPreset) => {
     onModeChange(preset.mode);
@@ -558,6 +715,54 @@ export function ImageComposer({
     }
     window.requestAnimationFrame(() => textareaRef.current?.focus());
   };
+
+  const handleBananaPromptSelect = (item: BananaPromptItem) => {
+    onModeChange(normalizePromptMode(item.mode));
+    onPromptChange(item.prompt);
+    onImageCountChange("1");
+    setIsPromptLibraryOpen(false);
+    window.requestAnimationFrame(() => textareaRef.current?.focus());
+  };
+
+  useEffect(() => {
+    if (!isPromptLibraryOpen || bananaPrompts.length >= BANANA_PROMPTS_EXPECTED_COUNT) {
+      return;
+    }
+
+    const controller = new AbortController();
+    const loadBananaPrompts = async () => {
+      setBananaPromptStatus("loading");
+      setBananaPromptError("");
+      try {
+        const response = await fetch(BANANA_PROMPTS_URL, {
+          signal: controller.signal,
+          cache: "no-store",
+        });
+        if (!response.ok) {
+          throw new Error(`本地资源返回 ${response.status}`);
+        }
+        const payload = await response.json();
+        const items = normalizeBananaPromptsPayload(payload);
+        if (items.length === 0) {
+          throw new Error("未读取到可用提示词");
+        }
+        setBananaPrompts(items);
+        setBananaPromptStatus("success");
+      } catch (error) {
+        if (controller.signal.aborted) {
+          return;
+        }
+        const message = error instanceof Error ? error.message : "提示词加载失败";
+        setBananaPromptError(message);
+        setBananaPromptStatus("error");
+      }
+    };
+
+    void loadBananaPrompts();
+    return () => {
+      controller.abort();
+    };
+  }, [bananaPromptRetryKey, bananaPrompts.length, isPromptLibraryOpen]);
 
   useEffect(() => {
     if (!isSizeMenuOpen) {
@@ -668,7 +873,201 @@ export function ImageComposer({
               </button>
             );
           })}
+          <button
+            type="button"
+            onClick={() => setIsPromptLibraryOpen(true)}
+            className="flex min-h-16 items-center gap-3 rounded-2xl border border-dashed border-stone-300 bg-white px-4 py-3 text-left text-stone-800 transition hover:border-stone-400 hover:bg-stone-50"
+          >
+            <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-stone-100 text-stone-600">
+              <Images className="size-4" />
+            </span>
+            <span className="min-w-0">
+              <span className="block truncate text-sm font-semibold">更多提示词</span>
+              <span className="mt-0.5 block truncate text-xs text-stone-500">来自 banana-prompt-quicker 示例库</span>
+            </span>
+          </button>
         </div>
+
+        <Dialog open={isPromptLibraryOpen} onOpenChange={setIsPromptLibraryOpen}>
+          <DialogContent className="flex h-[84vh] w-[min(94vw,1040px)] max-w-none flex-col overflow-hidden rounded-[28px] border-stone-200 bg-white p-0">
+            <DialogHeader className="border-b border-stone-200 px-5 pt-5 pb-4 sm:px-6">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0">
+                  <DialogTitle className="text-xl font-semibold text-stone-950">更多提示词</DialogTitle>
+                  <DialogDescription className="mt-2 leading-6 text-stone-500">
+                    本地内置 glidea/banana-prompt-quicker 快照{bananaPrompts.length > 0 ? `，已加载 ${bananaPrompts.length} 条` : ""}
+                    ，点击使用会填入提示词并自动切换文生图或图生图模式。
+                  </DialogDescription>
+                </div>
+                <Button
+                  type="button"
+                  asChild
+                  variant="outline"
+                  className="h-9 shrink-0 rounded-full border-stone-200 bg-white text-stone-700"
+                >
+                  <a href={BANANA_PROMPTS_REPO_URL} target="_blank" rel="noreferrer">
+                    <ExternalLink className="size-4" />
+                    源仓库
+                  </a>
+                </Button>
+              </div>
+              <div className="mt-4 flex flex-col gap-3">
+                <div className="relative min-w-0 flex-1">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-stone-400" />
+                  <Input
+                    value={bananaPromptQuery}
+                    onChange={(event) => setBananaPromptQuery(event.target.value)}
+                    placeholder="搜索标题、作者、分类或提示词内容"
+                    className="h-10 rounded-full border-stone-200 bg-stone-50 pl-9 text-sm shadow-none focus-visible:bg-white"
+                  />
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {bananaPromptRegularCategories.map((category) => (
+                    <button
+                      key={category}
+                      type="button"
+                      onClick={() => setBananaPromptCategory(category)}
+                      className={cn(
+                        "h-9 shrink-0 rounded-full border px-3 text-xs font-medium transition",
+                        category === bananaPromptCategory
+                          ? "border-stone-900 bg-stone-950 text-white"
+                          : "border-stone-200 bg-white text-stone-600 hover:border-stone-300 hover:text-stone-900",
+                      )}
+                    >
+                      {category}
+                    </button>
+                  ))}
+                  {bananaPromptNsfwCategories.length > 0 ? (
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <button
+                          type="button"
+                          className={cn(
+                            "inline-flex h-9 shrink-0 items-center gap-1 rounded-full border px-3 text-xs font-medium transition",
+                            isNsfwCategorySelected
+                              ? "border-stone-900 bg-stone-950 text-white"
+                              : "border-stone-200 bg-white text-stone-600 hover:border-stone-300 hover:text-stone-900",
+                          )}
+                        >
+                          更多
+                          <ChevronDown className="size-3.5" />
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent align="end" className="w-56 rounded-xl p-2">
+                        <div className="grid gap-1">
+                          {bananaPromptNsfwCategories.map((category) => (
+                            <button
+                              key={category}
+                              type="button"
+                              onClick={() => setBananaPromptCategory(category)}
+                              className={cn(
+                                "rounded-lg px-3 py-2 text-left text-xs font-medium transition",
+                                category === bananaPromptCategory
+                                  ? "bg-stone-950 text-white"
+                                  : "text-stone-600 hover:bg-stone-100 hover:text-stone-950",
+                              )}
+                            >
+                              {category}
+                            </button>
+                          ))}
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                  ) : null}
+                </div>
+              </div>
+            </DialogHeader>
+
+            <div className="min-h-0 flex-1 overflow-y-auto bg-stone-50/70 px-4 py-4 sm:px-6">
+              {bananaPromptStatus === "loading" || bananaPromptStatus === "idle" ? (
+                <div className="flex h-full min-h-[260px] items-center justify-center">
+                  <div className="flex items-center gap-2 text-sm text-stone-500">
+                    <LoaderCircle className="size-4 animate-spin" />
+                    正在读取本地提示词库
+                  </div>
+                </div>
+              ) : bananaPromptStatus === "error" ? (
+                <div className="flex h-full min-h-[260px] items-center justify-center text-center">
+                  <div className="max-w-sm">
+                    <div className="text-base font-semibold text-stone-900">提示词库加载失败</div>
+                    <p className="mt-2 text-sm leading-6 text-stone-500">{bananaPromptError || "请稍后重试。"}</p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="mt-4 rounded-full border-stone-200 bg-white"
+                      onClick={() => {
+                        setBananaPromptStatus("idle");
+                        setBananaPromptRetryKey((key) => key + 1);
+                      }}
+                    >
+                      重新加载
+                    </Button>
+                  </div>
+                </div>
+              ) : filteredBananaPrompts.length === 0 ? (
+                <div className="flex h-full min-h-[260px] items-center justify-center text-sm text-stone-500">
+                  没有匹配的提示词
+                </div>
+              ) : (
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                  {filteredBananaPrompts.map((item, index) => {
+                    const previewUrl = getBananaPromptPreviewUrl(item);
+                    return (
+                      <article
+                        key={`${item.title}-${item.created || index}`}
+                        className="overflow-hidden rounded-lg border border-stone-200 bg-white shadow-sm"
+                      >
+                        <div className="aspect-[4/3] bg-stone-100">
+                          {previewUrl ? (
+                            <img
+                              src={previewUrl}
+                              alt={`${item.title} 示例图`}
+                              loading="lazy"
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            <div className="flex h-full items-center justify-center text-stone-400">
+                              <Images className="size-8" />
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex min-h-[214px] flex-col gap-3 p-4">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Badge variant={normalizePromptMode(item.mode) === "edit" ? "info" : "success"}>
+                              {getPromptModeLabel(item.mode)}
+                            </Badge>
+                            <Badge variant="outline">{getPromptCategoryLabel(item)}</Badge>
+                          </div>
+                          <div className="min-w-0">
+                            <h3 className="line-clamp-2 text-sm font-semibold leading-5 text-stone-950">
+                              {item.title}
+                            </h3>
+                            <p className="mt-2 line-clamp-3 text-xs leading-5 text-stone-500">
+                              {summarizeBananaPrompt(item)}
+                            </p>
+                          </div>
+                          <div className="mt-auto flex items-center justify-between gap-3">
+                            <div className="min-w-0 truncate text-xs text-stone-400">
+                              {item.author ? `作者 ${item.author}` : "banana-prompt-quicker"}
+                            </div>
+                            <Button
+                              type="button"
+                              size="sm"
+                              className="h-8 shrink-0 rounded-full bg-stone-950 text-white hover:bg-stone-800"
+                              onClick={() => handleBananaPromptSelect(item)}
+                            >
+                              使用
+                            </Button>
+                          </div>
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
 
         <div className="rounded-[32px] border border-stone-200 bg-white">
           <div

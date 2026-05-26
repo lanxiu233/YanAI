@@ -338,9 +338,9 @@ curl http://localhost:8000/v1/responses \
 
 ## 致谢
 
-感谢 [basketikun/chatgpt2api](https://github.com/basketikun/chatgpt2api) 项目在 ChatGPT 官网能力逆向整理、OpenAI 兼容接口封装和自托管部署思路上的探索与开源分享。颜AI 的项目方向与部分实现思路受其启发。
+感谢 [basketikun/chatgpt2api](https://github.com/basketikun/chatgpt2api) 项目在 ChatGPT 逆向整理、OpenAI 兼容接口封装和自托管部署思路上的探索与开源分享。颜AI 的项目方向与部分实现思路受其启发。[L站帖子](https://linux.do/t/topic/2070927)
 感谢 [L站佬友提供的提示词](https://linux.do/t/topic/532495)
-感谢 [glidea/banana-prompt-quicker](https://github.com/glidea/banana-prompt-quicker) 项目在提示词快捷工作流上的开源分享与启发。
+感谢 [glidea/banana-prompt-quicker](https://github.com/glidea/banana-prompt-quicker) 项目在提示词快捷工作流上的开源分享与启发。[L站帖子](https://linux.do/t/topic/1244563)
 
 ## Contributors
 
