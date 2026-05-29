@@ -82,7 +82,9 @@ class AuthService:
         self._users = self._load_users()
         self._sessions = self._load_sessions()
         self._redeem_codes = self._load_redeem_codes()
+        self._quota_reservations: dict[str, dict[str, object]] = {}
         self._last_used_flush_at: dict[str, datetime] = {}
+        self.expire_quota_reservations()
 
     @staticmethod
     def _clean(value: object) -> str:
@@ -703,24 +705,162 @@ class AuthService:
     def deduct_quota(self, user_id: str, amount: int) -> dict[str, object] | None:
         if amount <= 0:
             return self.get_user(user_id)
+        request_id = f"legacy-deduct-{uuid.uuid4().hex}"
+        self.reserve_quota(user_id, amount, request_id)
+        self.confirm_quota(request_id)
+        return self.get_user(user_id)
+
+    def reserve_quota(
+        self,
+        user_id: str,
+        amount: int,
+        request_id: str,
+        *,
+        ttl_seconds: int = 900,
+    ) -> dict[str, object] | None:
+        normalized_user_id = self._clean(user_id)
+        normalized_request_id = self._clean(request_id)
+        normalized_amount = int(amount or 0)
+        if normalized_amount <= 0:
+            return None
+        if not normalized_request_id:
+            raise ValueError("request id is required")
         with self._lock:
-            index = self._find_user_index_by_id(self._clean(user_id))
+            index = self._find_user_index_by_id(normalized_user_id)
             if index < 0:
-                return None
-            user = dict(self._users[index])
+                raise ValueError("user not found")
+            user = self._users[index]
             if user.get("role") == "admin":
-                return self._public_user(user)
-            user["quota"] = max(0, int(user.get("quota") or 0) - amount)
-            user["quota_used"] = int(user.get("quota_used") or 0) + amount
-            user["updated_at"] = _now_iso()
+                return None
+            if self.repositories is not None:
+                reservation = self.repositories.quota_reservations.reserve(
+                    normalized_user_id,
+                    normalized_amount,
+                    normalized_request_id,
+                    ttl_seconds=ttl_seconds,
+                )
+                self._users = self._load_users()
+                return reservation
+            self._expire_quota_reservations_locked()
+            existing = self._quota_reservations.get(normalized_request_id)
+            if existing is not None:
+                return dict(existing)
+            user = dict(self._users[index])
+            if int(user.get("quota") or 0) < normalized_amount:
+                raise ValueError("insufficient image quota")
+            now = _now()
+            expires_at = now + timedelta(seconds=max(1, int(ttl_seconds or 900)))
+            user["quota"] = max(0, int(user.get("quota") or 0) - normalized_amount)
+            user["updated_at"] = now.isoformat()
             self._users[index] = self._normalize_user(user) or user
+            reservation = {
+                "id": uuid.uuid4().hex,
+                "user_id": normalized_user_id,
+                "request_id": normalized_request_id,
+                "amount": normalized_amount,
+                "status": "reserved",
+                "created_at": now.isoformat(),
+                "expires_at": expires_at.isoformat(),
+            }
+            self._quota_reservations[normalized_request_id] = reservation
             self._save_users()
-            return self._public_user(self._users[index])
+            return dict(reservation)
+
+    def confirm_quota(self, request_id: str, amount: int | None = None) -> dict[str, object] | None:
+        normalized_request_id = self._clean(request_id)
+        if not normalized_request_id:
+            return None
+        with self._lock:
+            if self.repositories is not None:
+                reservation = self.repositories.quota_reservations.confirm(normalized_request_id, amount=amount)
+                self._users = self._load_users()
+                return reservation
+            reservation = self._quota_reservations.get(normalized_request_id)
+            if reservation is None:
+                return None
+            if reservation.get("status") != "reserved":
+                return dict(reservation)
+            reserved_amount = max(0, int(reservation.get("amount") or 0))
+            confirmed_amount = reserved_amount if amount is None else max(0, min(int(amount or 0), reserved_amount))
+            refund_amount = max(0, reserved_amount - confirmed_amount)
+            index = self._find_user_index_by_id(self._clean(reservation.get("user_id")))
+            if index >= 0:
+                user = dict(self._users[index])
+                user["quota"] = max(0, int(user.get("quota") or 0) + refund_amount)
+                user["quota_used"] = int(user.get("quota_used") or 0) + confirmed_amount
+                user["updated_at"] = _now_iso()
+                self._users[index] = self._normalize_user(user) or user
+                self._save_users()
+            reservation.update(
+                {
+                    "status": "confirmed",
+                    "confirmed_at": _now_iso(),
+                    "confirmed_amount": confirmed_amount,
+                    "released_amount": refund_amount,
+                }
+            )
+            return dict(reservation)
+
+    def release_quota(self, request_id: str) -> dict[str, object] | None:
+        normalized_request_id = self._clean(request_id)
+        if not normalized_request_id:
+            return None
+        with self._lock:
+            if self.repositories is not None:
+                reservation = self.repositories.quota_reservations.release(normalized_request_id)
+                self._users = self._load_users()
+                return reservation
+            reservation = self._quota_reservations.get(normalized_request_id)
+            if reservation is None:
+                return None
+            if reservation.get("status") != "reserved":
+                return dict(reservation)
+            index = self._find_user_index_by_id(self._clean(reservation.get("user_id")))
+            if index >= 0:
+                user = dict(self._users[index])
+                user["quota"] = int(user.get("quota") or 0) + max(0, int(reservation.get("amount") or 0))
+                user["updated_at"] = _now_iso()
+                self._users[index] = self._normalize_user(user) or user
+                self._save_users()
+            reservation.update({"status": "released", "released_at": _now_iso()})
+            return dict(reservation)
+
+    def expire_quota_reservations(self) -> int:
+        with self._lock:
+            if self.repositories is not None:
+                expired = self.repositories.quota_reservations.expire()
+                if expired:
+                    self._users = self._load_users()
+                return expired
+            return self._expire_quota_reservations_locked()
+
+    def _expire_quota_reservations_locked(self) -> int:
+        now = _now()
+        expired = 0
+        for reservation in list(self._quota_reservations.values()):
+            if reservation.get("status") != "reserved":
+                continue
+            expires_at = _parse_time(reservation.get("expires_at"))
+            if expires_at is None or expires_at > now:
+                continue
+            index = self._find_user_index_by_id(self._clean(reservation.get("user_id")))
+            if index >= 0:
+                user = dict(self._users[index])
+                user["quota"] = int(user.get("quota") or 0) + max(0, int(reservation.get("amount") or 0))
+                user["updated_at"] = now.isoformat()
+                self._users[index] = self._normalize_user(user) or user
+            reservation.update({"status": "expired", "expired_at": now.isoformat()})
+            expired += 1
+        if expired:
+            self._save_users()
+        return expired
 
     def list_redeem_codes(self, query: str = "", status: str = "") -> list[dict[str, object]]:
         query_text = self._clean(query).upper()
         status_text = self._clean(status).lower()
         with self._lock:
+            if self.repositories is not None:
+                self._redeem_codes = self._load_redeem_codes()
             items = []
             for item in self._redeem_codes:
                 if query_text and query_text not in str(item.get("code") or ""):
@@ -745,6 +885,8 @@ class AuthService:
         amount = max(1, int(quota or 1))
         uses = max(1, int(max_uses or 1))
         with self._lock:
+            if self.repositories is not None:
+                self._redeem_codes = self._load_redeem_codes()
             existing_codes = {str(item.get("code") or "") for item in self._redeem_codes}
             created: list[dict[str, object]] = []
             while len(created) < total:
@@ -768,13 +910,20 @@ class AuthService:
                     continue
                 existing_codes.add(code)
                 created.append(item)
-            self._redeem_codes = [*created, *self._redeem_codes]
-            self._save_redeem_codes()
+            if self.repositories is not None:
+                for item in reversed(created):
+                    self.repositories.redeem_codes.upsert(dict(item))
+                self._redeem_codes = self._load_redeem_codes()
+            else:
+                self._redeem_codes = [*created, *self._redeem_codes]
+                self._save_redeem_codes()
             return [dict(item) for item in created]
 
     def update_redeem_code(self, code_id: str, updates: dict[str, object]) -> dict[str, object] | None:
         normalized_id = self._clean(code_id)
         with self._lock:
+            if self.repositories is not None:
+                self._redeem_codes = self._load_redeem_codes()
             for index, item in enumerate(self._redeem_codes):
                 if item.get("id") != normalized_id:
                     continue
@@ -785,8 +934,12 @@ class AuthService:
                 normalized = self._normalize_redeem_code(next_item)
                 if normalized is None:
                     return None
-                self._redeem_codes[index] = normalized
-                self._save_redeem_codes()
+                if self.repositories is not None:
+                    self.repositories.redeem_codes.upsert(dict(normalized))
+                    self._redeem_codes = self._load_redeem_codes()
+                else:
+                    self._redeem_codes[index] = normalized
+                    self._save_redeem_codes()
                 return dict(normalized)
         return None
 
@@ -796,6 +949,14 @@ class AuthService:
         if not normalized_ids:
             return 0
         with self._lock:
+            if self.repositories is not None:
+                removed = 0
+                for code_id in normalized_ids:
+                    if self.repositories.redeem_codes.delete(code_id):
+                        removed += 1
+                if removed:
+                    self._redeem_codes = self._load_redeem_codes()
+                return removed
             before = len(self._redeem_codes)
             self._redeem_codes = [
                 item
@@ -813,6 +974,11 @@ class AuthService:
         if not code:
             raise ValueError("redeem code is required")
         with self._lock:
+            if self.repositories is not None:
+                user, item = self.repositories.redeem_codes.redeem(self._clean(user_id), code)
+                self._users = self._load_users()
+                self._redeem_codes = self._load_redeem_codes()
+                return self._public_user(self._normalize_user(user) or user), dict(item)
             user_index = self._find_user_index_by_id(self._clean(user_id))
             if user_index < 0:
                 raise ValueError("user not found")

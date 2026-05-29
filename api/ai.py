@@ -9,6 +9,7 @@ from services.auth_service import auth_service
 from services.channel_service import channel_service
 from services.image_service import record_image_result
 from services.log_service import LoggedCall
+from services.observability import request_id_from_request
 from services.protocol import (
     anthropic_v1_messages,
     openai_v1_chat_complete,
@@ -68,6 +69,23 @@ def create_router() -> APIRouter:
             if isinstance(item, dict) and (item.get("b64_json") or item.get("url"))
         )
 
+    def reserve_image_quota(identity: dict[str, object], amount: int, request_id: str) -> str | None:
+        if identity.get("role") != "user":
+            return None
+        try:
+            auth_service.reserve_quota(str(identity.get("id") or ""), amount, request_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=429, detail={"error": str(exc)}) from exc
+        return request_id
+
+    def finalize_quota(request_id: str | None, count: int) -> None:
+        if not request_id:
+            return
+        if count > 0:
+            auth_service.confirm_quota(request_id, count)
+        else:
+            auth_service.release_quota(request_id)
+
     def finalize_image_result(
             identity: dict[str, object],
             result: dict[str, object],
@@ -77,10 +95,11 @@ def create_router() -> APIRouter:
             model: str,
             size: str | None,
             channel: str,
-    ) -> None:
+            request_id: str,
+    ) -> int:
         count = successful_image_count(result)
         if count <= 0:
-            return
+            return 0
         record_image_result(
             identity,
             result,
@@ -90,9 +109,9 @@ def create_router() -> APIRouter:
             size=size,
             channel=channel,
             quota_cost=1 if identity.get("role") == "user" else 0,
+            request_id=request_id,
         )
-        if identity.get("role") == "user":
-            auth_service.deduct_quota(str(identity.get("id") or ""), count)
+        return count
 
     @router.get("/v1/models")
     async def list_models(authorization: str | None = Header(default=None)):
@@ -111,41 +130,49 @@ def create_router() -> APIRouter:
         identity = require_identity(authorization)
         if identity.get("role") == "user" and body.stream:
             raise HTTPException(status_code=400, detail={"error": "stream is not supported for personal image tasks"})
-        if identity.get("role") == "user":
-            try:
-                auth_service.ensure_quota(str(identity.get("id") or ""), int(body.n or 1))
-            except ValueError as exc:
-                raise HTTPException(status_code=429, detail={"error": str(exc)}) from exc
+        request_id = request_id_from_request(request)
+        quota_request_id = reserve_image_quota(identity, int(body.n or 1), request_id)
         payload = body.model_dump(mode="python")
         payload["base_url"] = resolve_image_base_url(request)
-        call = LoggedCall(identity, "/v1/images/generations", body.model, "文生图")
-        if not body.stream:
-            routed = await run_in_threadpool(channel_service.call_generation, payload)
-            if routed is not None:
-                result, channel_name = routed
-                call.log("渠道调用完成", result)
-                finalize_image_result(
+        payload["request_id"] = request_id
+        call = LoggedCall(identity, "/v1/images/generations", body.model, "文生图", request_id=request_id)
+        try:
+            if not body.stream:
+                routed = await run_in_threadpool(channel_service.call_generation, payload)
+                if routed is not None:
+                    result, channel_name = routed
+                    call.log("渠道调用完成", result)
+                    count = finalize_image_result(
+                        identity,
+                        result,
+                        prompt=body.prompt,
+                        mode="generate",
+                        model=body.model,
+                        size=body.size,
+                        channel=channel_name,
+                        request_id=request_id,
+                    )
+                    finalize_quota(quota_request_id, count)
+                    return result
+            result = await call.run(openai_v1_image_generations.handle, payload)
+            count = 0
+            if isinstance(result, dict):
+                count = finalize_image_result(
                     identity,
                     result,
                     prompt=body.prompt,
                     mode="generate",
                     model=body.model,
                     size=body.size,
-                    channel=channel_name,
+                    channel="internal_pool",
+                    request_id=request_id,
                 )
-                return result
-        result = await call.run(openai_v1_image_generations.handle, payload)
-        if isinstance(result, dict):
-            finalize_image_result(
-                identity,
-                result,
-                prompt=body.prompt,
-                mode="generate",
-                model=body.model,
-                size=body.size,
-                channel="internal_pool",
-            )
-        return result
+            finalize_quota(quota_request_id, count)
+            return result
+        except Exception:
+            if quota_request_id:
+                auth_service.release_quota(quota_request_id)
+            raise
 
     @router.post("/v1/images/edits")
     async def edit_images(
@@ -165,11 +192,6 @@ def create_router() -> APIRouter:
             raise HTTPException(status_code=400, detail={"error": "stream is not supported for personal image tasks"})
         if n < 1 or n > 4:
             raise HTTPException(status_code=400, detail={"error": "n must be between 1 and 4"})
-        if identity.get("role") == "user":
-            try:
-                auth_service.ensure_quota(str(identity.get("id") or ""), int(n or 1))
-            except ValueError as exc:
-                raise HTTPException(status_code=429, detail={"error": str(exc)}) from exc
         uploads = [*(image or []), *(image_list or [])]
         if not uploads:
             raise HTTPException(status_code=400, detail={"error": "image file is required"})
@@ -179,6 +201,8 @@ def create_router() -> APIRouter:
             if not image_data:
                 raise HTTPException(status_code=400, detail={"error": "image file is empty"})
             images.append((image_data, upload.filename or "image.png", upload.content_type or "image/png"))
+        request_id = request_id_from_request(request)
+        quota_request_id = reserve_image_quota(identity, int(n or 1), request_id)
         payload = {
             "prompt": prompt,
             "images": images,
@@ -188,59 +212,81 @@ def create_router() -> APIRouter:
             "response_format": response_format,
             "stream": stream,
             "base_url": resolve_image_base_url(request),
+            "request_id": request_id,
         }
-        call = LoggedCall(identity, "/v1/images/edits", model, "图生图")
-        if not stream:
-            routed = await run_in_threadpool(channel_service.call_edit, payload)
-            if routed is not None:
-                result, channel_name = routed
-                call.log("渠道调用完成", result)
-                finalize_image_result(
+        call = LoggedCall(identity, "/v1/images/edits", model, "图生图", request_id=request_id)
+        try:
+            if not stream:
+                routed = await run_in_threadpool(channel_service.call_edit, payload)
+                if routed is not None:
+                    result, channel_name = routed
+                    call.log("渠道调用完成", result)
+                    count = finalize_image_result(
+                        identity,
+                        result,
+                        prompt=prompt,
+                        mode="edit",
+                        model=model,
+                        size=size,
+                        channel=channel_name,
+                        request_id=request_id,
+                    )
+                    finalize_quota(quota_request_id, count)
+                    return result
+            result = await call.run(openai_v1_image_edit.handle, payload)
+            count = 0
+            if isinstance(result, dict):
+                count = finalize_image_result(
                     identity,
                     result,
                     prompt=prompt,
                     mode="edit",
                     model=model,
                     size=size,
-                    channel=channel_name,
+                    channel="internal_pool",
+                    request_id=request_id,
                 )
-                return result
-        result = await call.run(openai_v1_image_edit.handle, payload)
-        if isinstance(result, dict):
-            finalize_image_result(
-                identity,
-                result,
-                prompt=prompt,
-                mode="edit",
-                model=model,
-                size=size,
-                channel="internal_pool",
-            )
-        return result
+            finalize_quota(quota_request_id, count)
+            return result
+        except Exception:
+            if quota_request_id:
+                auth_service.release_quota(quota_request_id)
+            raise
 
     @router.post("/v1/chat/completions")
-    async def create_chat_completion(body: ChatCompletionRequest, authorization: str | None = Header(default=None)):
+    async def create_chat_completion(
+            body: ChatCompletionRequest,
+            request: Request,
+            authorization: str | None = Header(default=None),
+    ):
         identity = require_identity(authorization)
         if identity.get("role") == "user":
             raise HTTPException(status_code=403, detail={"error": "personal users can only use image features"})
         payload = body.model_dump(mode="python")
         model = str(payload.get("model") or "auto")
-        call = LoggedCall(identity, "/v1/chat/completions", model, "文本生成")
+        request_id = request_id_from_request(request)
+        call = LoggedCall(identity, "/v1/chat/completions", model, "文本生成", request_id=request_id)
         return await call.run(openai_v1_chat_complete.handle, payload)
 
     @router.post("/v1/responses")
-    async def create_response(body: ResponseCreateRequest, authorization: str | None = Header(default=None)):
+    async def create_response(
+            body: ResponseCreateRequest,
+            request: Request,
+            authorization: str | None = Header(default=None),
+    ):
         identity = require_identity(authorization)
         if identity.get("role") == "user":
             raise HTTPException(status_code=403, detail={"error": "personal users can only use image features"})
         payload = body.model_dump(mode="python")
         model = str(payload.get("model") or "auto")
-        call = LoggedCall(identity, "/v1/responses", model, "Responses")
+        request_id = request_id_from_request(request)
+        call = LoggedCall(identity, "/v1/responses", model, "Responses", request_id=request_id)
         return await call.run(openai_v1_response.handle, payload)
 
     @router.post("/v1/messages")
     async def create_message(
             body: AnthropicMessageRequest,
+            request: Request,
             authorization: str | None = Header(default=None),
             x_api_key: str | None = Header(default=None, alias="x-api-key"),
             anthropic_version: str | None = Header(default=None, alias="anthropic-version"),
@@ -250,7 +296,8 @@ def create_router() -> APIRouter:
             raise HTTPException(status_code=403, detail={"error": "personal users can only use image features"})
         payload = body.model_dump(mode="python")
         model = str(payload.get("model") or "auto")
-        call = LoggedCall(identity, "/v1/messages", model, "Messages")
+        request_id = request_id_from_request(request)
+        call = LoggedCall(identity, "/v1/messages", model, "Messages", request_id=request_id)
         return await call.run(anthropic_v1_messages.handle, payload, sse="anthropic")
 
     return router

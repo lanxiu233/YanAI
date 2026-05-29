@@ -5,6 +5,7 @@ import hashlib
 import json
 import re
 import time
+import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterable, Iterator
@@ -13,8 +14,10 @@ import tiktoken
 
 from services.account_service import account_service
 from services.config import config
+from services.log_service import LOG_TYPE_ACCOUNT, log_service
+from services.observability import get_current_request_id
 from services.openai_backend_api import OpenAIBackendAPI
-from utils.helper import IMAGE_MODELS
+from utils.helper import IMAGE_MODELS, anonymize_token
 from utils.log import logger
 
 
@@ -61,7 +64,7 @@ def encode_images(images: Iterable[tuple[bytes, str, str]]) -> list[str]:
 def save_image_bytes(image_data: bytes, base_url: str | None = None) -> str:
     config.cleanup_old_images()
     file_hash = hashlib.md5(image_data).hexdigest()
-    filename = f"{int(time.time())}_{file_hash}.png"
+    filename = f"{file_hash}_{uuid.uuid4().hex}.png"
     relative_dir = Path(time.strftime("%Y"), time.strftime("%m"), time.strftime("%d"))
     file_path = config.images_dir / relative_dir / filename
     file_path.parent.mkdir(parents=True, exist_ok=True)
@@ -187,6 +190,7 @@ class ConversationRequest:
     size: str | None = None
     response_format: str = "b64_json"
     base_url: str | None = None
+    request_id: str = ""
     message_as_error: bool = False
 
 
@@ -535,10 +539,24 @@ def stream_image_outputs_with_pool(request: ConversationRequest) -> Iterator[Ima
 
     emitted = False
     last_error = ""
+    lease_owner = str(request.request_id or get_current_request_id() or "").strip() or None
     for index in range(1, request.n + 1):
         while True:
             try:
-                token = account_service.get_available_access_token()
+                lease = account_service.lease_available_account(lease_owner=lease_owner)
+                token = lease.access_token
+                log_service.add(
+                    LOG_TYPE_ACCOUNT,
+                    "获取账号租约",
+                    {
+                        "request_id": lease.lease_owner,
+                        "lease_owner": lease.lease_owner,
+                        "token": anonymize_token(token),
+                        "index": index,
+                        "total": request.n,
+                    },
+                    request_id=lease.lease_owner,
+                )
             except RuntimeError as exc:
                 if emitted:
                     return
@@ -563,17 +581,71 @@ def stream_image_outputs_with_pool(request: ConversationRequest) -> Iterator[Ima
                     returned_result = returned_result or output.kind == "result"
                     yield output
                 if returned_message or not returned_result:
-                    account_service.mark_image_result(token, False)
+                    account_service.release_image_account(lease, False)
+                    log_service.add(
+                        LOG_TYPE_ACCOUNT,
+                        "释放账号租约",
+                        {
+                            "request_id": lease.lease_owner,
+                            "lease_owner": lease.lease_owner,
+                            "token": anonymize_token(token),
+                            "success": False,
+                            "reason": "message",
+                        },
+                        request_id=lease.lease_owner,
+                    )
                     return
-                account_service.mark_image_result(token, True)
+                account_service.release_image_account(lease, True)
+                log_service.add(
+                    LOG_TYPE_ACCOUNT,
+                    "释放账号租约",
+                    {
+                        "request_id": lease.lease_owner,
+                        "lease_owner": lease.lease_owner,
+                        "token": anonymize_token(token),
+                        "success": True,
+                        "reason": "result",
+                    },
+                    request_id=lease.lease_owner,
+                )
                 break
             except ImageGenerationError:
-                account_service.mark_image_result(token, False)
+                account_service.release_image_account(lease, False)
+                log_service.add(
+                    LOG_TYPE_ACCOUNT,
+                    "释放账号租约",
+                    {
+                        "request_id": lease.lease_owner,
+                        "lease_owner": lease.lease_owner,
+                        "token": anonymize_token(token),
+                        "success": False,
+                        "reason": "image_generation_error",
+                    },
+                    request_id=lease.lease_owner,
+                )
                 raise
             except Exception as exc:
-                account_service.mark_image_result(token, False)
+                account_service.release_image_account(lease, False)
                 last_error = str(exc)
-                logger.warning({"event": "image_stream_fail", "request_token": token, "error": last_error})
+                log_service.add(
+                    LOG_TYPE_ACCOUNT,
+                    "释放账号租约",
+                    {
+                        "request_id": lease.lease_owner,
+                        "lease_owner": lease.lease_owner,
+                        "token": anonymize_token(token),
+                        "success": False,
+                        "reason": "exception",
+                        "error": last_error,
+                    },
+                    request_id=lease.lease_owner,
+                )
+                logger.warning({
+                    "event": "image_stream_fail",
+                    "request_id": lease_owner,
+                    "request_token": token,
+                    "error": last_error,
+                })
                 if not emitted_for_token and is_token_invalid_error(last_error):
                     account_service.remove_invalid_token(token, "image_stream")
                     continue

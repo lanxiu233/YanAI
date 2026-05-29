@@ -39,6 +39,10 @@ export type Account = {
   success: number;
   fail: number;
   lastUsedAt: string | null;
+  inflightCount?: number;
+  maxConcurrency?: number;
+  leaseOwner?: string | null;
+  leasedUntil?: string | null;
 };
 
 type AccountListResponse = {
@@ -103,11 +107,35 @@ export type SettingsConfig = {
 };
 
 export type ManagedImage = {
+  id?: string;
+  record_id?: string;
   name: string;
   date: string;
   size: number;
   url: string;
   created_at: string;
+  owner_user_id?: string;
+  owner_name?: string;
+  owner_email?: string;
+  prompt?: string;
+  mode?: string;
+  model?: string;
+  image_size?: string;
+  channel?: string;
+  quota_cost?: number;
+};
+
+export type ImageListPagination = {
+  page: number;
+  page_size: number;
+  total: number;
+  page_count: number;
+};
+
+export type ImageListResponse = {
+  items: ManagedImage[];
+  groups: Array<{ date: string; items: ManagedImage[] }>;
+  pagination: ImageListPagination;
 };
 
 export type PromptLibraryItem = {
@@ -157,10 +185,18 @@ type PromptLibraryResponse = {
 
 export type SystemLog = {
   time: string;
-  type: "call" | "account" | string;
+  type: "call" | "account" | "audit" | string;
   summary?: string;
   detail?: Record<string, unknown>;
   [key: string]: unknown;
+};
+
+export type LogListResponse = {
+  items: SystemLog[];
+  total: number;
+  page: number;
+  page_size: number;
+  page_count: number;
 };
 
 export type ImageResponse = {
@@ -358,6 +394,7 @@ export async function updateAccount(
     type?: AccountType;
     status?: AccountStatus;
     quota?: number;
+    max_concurrency?: number;
   },
 ) {
   return httpRequest<AccountUpdateResponse>("/api/accounts/update", {
@@ -421,13 +458,24 @@ export async function updateSettingsConfig(settings: SettingsConfig) {
   });
 }
 
-export async function fetchManagedImages(filters: { start_date?: string; end_date?: string }) {
+export async function fetchManagedImages(filters: {
+  start_date?: string;
+  end_date?: string;
+  user_id?: string;
+  channel?: string;
+  request_id?: string;
+  page?: number;
+  page_size?: number;
+}) {
   const params = new URLSearchParams();
   if (filters.start_date) params.set("start_date", filters.start_date);
   if (filters.end_date) params.set("end_date", filters.end_date);
-  return httpRequest<{ items: ManagedImage[]; groups: Array<{ date: string; items: ManagedImage[] }> }>(
-    `/api/images${params.toString() ? `?${params.toString()}` : ""}`,
-  );
+  if (filters.user_id) params.set("user_id", filters.user_id);
+  if (filters.channel) params.set("channel", filters.channel);
+  if (filters.request_id) params.set("request_id", filters.request_id);
+  if (filters.page) params.set("page", String(filters.page));
+  if (filters.page_size) params.set("page_size", String(filters.page_size));
+  return httpRequest<ImageListResponse>(`/api/images${params.toString() ? `?${params.toString()}` : ""}`);
 }
 
 export async function fetchPromptLibrary() {
@@ -467,21 +515,36 @@ export async function uploadPromptExampleImage(file: File) {
   });
 }
 
-export async function fetchMyImages(filters: { start_date?: string; end_date?: string }) {
+export async function fetchMyImages(filters: {
+  start_date?: string;
+  end_date?: string;
+  page?: number;
+  page_size?: number;
+}) {
   const params = new URLSearchParams();
   if (filters.start_date) params.set("start_date", filters.start_date);
   if (filters.end_date) params.set("end_date", filters.end_date);
-  return httpRequest<{ items: ManagedImage[]; groups: Array<{ date: string; items: ManagedImage[] }> }>(
-    `/api/me/images${params.toString() ? `?${params.toString()}` : ""}`,
-  );
+  if (filters.page) params.set("page", String(filters.page));
+  if (filters.page_size) params.set("page_size", String(filters.page_size));
+  return httpRequest<ImageListResponse>(`/api/me/images${params.toString() ? `?${params.toString()}` : ""}`);
 }
 
-export async function fetchSystemLogs(filters: { type?: string; start_date?: string; end_date?: string }) {
+export async function fetchSystemLogs(filters: {
+  type?: string;
+  start_date?: string;
+  end_date?: string;
+  request_id?: string;
+  page?: number;
+  page_size?: number;
+}) {
   const params = new URLSearchParams();
   if (filters.type) params.set("type", filters.type);
   if (filters.start_date) params.set("start_date", filters.start_date);
   if (filters.end_date) params.set("end_date", filters.end_date);
-  return httpRequest<{ items: SystemLog[] }>(`/api/logs${params.toString() ? `?${params.toString()}` : ""}`);
+  if (filters.request_id) params.set("request_id", filters.request_id);
+  if (filters.page) params.set("page", String(filters.page));
+  if (filters.page_size) params.set("page_size", String(filters.page_size));
+  return httpRequest<LogListResponse>(`/api/logs${params.toString() ? `?${params.toString()}` : ""}`);
 }
 
 export async function fetchUserKeys() {

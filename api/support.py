@@ -98,6 +98,22 @@ def start_limited_account_watcher(stop_event: Event) -> Thread:
     return thread
 
 
+def start_quota_reservation_watcher(stop_event: Event) -> Thread:
+    def worker() -> None:
+        while not stop_event.is_set():
+            try:
+                expired = auth_service.expire_quota_reservations()
+                if expired:
+                    print(f"[quota-reservation-watcher] expired {expired} reservations")
+            except Exception as exc:
+                print(f"[quota-reservation-watcher] fail {exc}")
+            stop_event.wait(60)
+
+    thread = Thread(target=worker, name="quota-reservation-watcher", daemon=True)
+    thread.start()
+    return thread
+
+
 def resolve_web_asset(requested_path: str) -> Path | None:
     if not WEB_DIST_DIR.exists():
         return None

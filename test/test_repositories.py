@@ -35,12 +35,31 @@ class RepositoryDatabaseStorageTest(unittest.TestCase):
             self.assertEqual(storage.load_channels()[0]["id"], "channel-a")
             self.assertEqual(storage.load_prompt_library()[0]["id"], "prompt-a")
             self.assertEqual(storage.load_image_records()[0]["id"], "image-a")
+            storage.repository_provider.image_records.insert(
+                {
+                    "record_id": "image-b",
+                    "url": "http://127.0.0.1:8000/images/2026/05/29/b.png",
+                    "owner_user_id": "user-a",
+                    "created_at": "2026-05-29 12:00:00",
+                    "channel": "external",
+                }
+            )
+            page = storage.repository_provider.image_records.query(
+                owner_user_id="user-a",
+                start_date="2026-05-28",
+                end_date="2026-05-29",
+                page=1,
+                page_size=1,
+            )
+            self.assertEqual(page["total"], 2)
+            self.assertEqual(page["page_count"], 2)
+            self.assertEqual(page["items"][0]["record_id"], "image-b")
 
             health = storage.health_check()
             self.assertEqual(health["status"], "healthy")
             self.assertEqual(health["accounts_count"], 1)
             self.assertEqual(health["users_count"], 1)
-            self.assertEqual(health["image_records_count"], 1)
+            self.assertEqual(health["image_records_count"], 2)
 
             with storage.engine.connect() as connection:
                 account = connection.execute(

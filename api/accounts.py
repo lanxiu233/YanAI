@@ -5,6 +5,8 @@ from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field
 
 from services.auth_service import auth_service
+from services.log_service import audit_service
+from utils.helper import anonymize_token
 
 from api.support import (
     require_admin,
@@ -54,6 +56,7 @@ class AccountUpdateRequest(BaseModel):
     type: str | None = None
     status: str | None = None
     quota: int | None = None
+    max_concurrency: int | None = Field(default=None, ge=1)
 
 
 class CPAPoolCreateRequest(BaseModel):
@@ -148,12 +151,24 @@ def create_router() -> APIRouter:
 
     @router.post("/api/accounts")
     async def create_accounts(body: AccountCreateRequest, authorization: str | None = Header(default=None)):
-        require_admin(authorization)
+        admin = require_admin(authorization)
         tokens = [str(token or "").strip() for token in body.tokens if str(token or "").strip()]
         if not tokens:
             raise HTTPException(status_code=400, detail={"error": "tokens is required"})
         result = account_service.add_accounts(tokens)
         refresh_result = account_service.refresh_accounts(tokens)
+        audit_service.add(
+            actor=admin,
+            action="accounts.create",
+            resource="account",
+            detail={
+                "tokens_count": len(tokens),
+                "added": result.get("added", 0),
+                "skipped": result.get("skipped", 0),
+                "refreshed": refresh_result.get("refreshed", 0),
+                "errors_count": len(refresh_result.get("errors", [])),
+            },
+        )
         return {
             **result,
             "refreshed": refresh_result.get("refreshed", 0),
@@ -163,11 +178,22 @@ def create_router() -> APIRouter:
 
     @router.delete("/api/accounts")
     async def delete_accounts(body: AccountDeleteRequest, authorization: str | None = Header(default=None)):
-        require_admin(authorization)
+        admin = require_admin(authorization)
         tokens = [str(token or "").strip() for token in body.tokens if str(token or "").strip()]
         if not tokens:
             raise HTTPException(status_code=400, detail={"error": "tokens is required"})
-        return account_service.delete_accounts(tokens)
+        result = account_service.delete_accounts(tokens)
+        audit_service.add(
+            actor=admin,
+            action="accounts.delete",
+            resource="account",
+            detail={
+                "tokens_count": len(tokens),
+                "tokens": [anonymize_token(token) for token in tokens],
+                "removed": result.get("removed", 0),
+            },
+        )
+        return result
 
     @router.post("/api/accounts/export")
     async def export_accounts(body: AccountExportRequest, authorization: str | None = Header(default=None)):
@@ -189,16 +215,35 @@ def create_router() -> APIRouter:
 
     @router.post("/api/accounts/update")
     async def update_account(body: AccountUpdateRequest, authorization: str | None = Header(default=None)):
-        require_admin(authorization)
+        admin = require_admin(authorization)
         access_token = str(body.access_token or "").strip()
         if not access_token:
             raise HTTPException(status_code=400, detail={"error": "access_token is required"})
-        updates = {key: value for key, value in {"type": body.type, "status": body.status, "quota": body.quota}.items() if value is not None}
+        updates = {
+            key: value
+            for key, value in {
+                "type": body.type,
+                "status": body.status,
+                "quota": body.quota,
+                "max_concurrency": body.max_concurrency,
+            }.items()
+            if value is not None
+        }
         if not updates:
             raise HTTPException(status_code=400, detail={"error": "no updates provided"})
         account = account_service.update_account(access_token, updates)
         if account is None:
             raise HTTPException(status_code=404, detail={"error": "account not found"})
+        audit_service.add(
+            actor=admin,
+            action="accounts.update",
+            resource="account",
+            target_id=anonymize_token(access_token),
+            detail={
+                "token": anonymize_token(access_token),
+                "updates": updates,
+            },
+        )
         return {"item": account, "items": account_service.list_accounts()}
 
     @router.get("/api/cpa/pools")

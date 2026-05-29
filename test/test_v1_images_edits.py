@@ -7,10 +7,10 @@ from pathlib import Path
 
 import requests
 
-from test.utils import save_image
+from test.utils import load_auth_key, save_image
 from utils.log import logger
 
-AUTH_KEY = "chatgpt2api"
+AUTH_KEY = load_auth_key()
 BASE_URL = "http://localhost:8000"
 ASSETS_DIR = Path(__file__).resolve().parents[1] / "assets"
 

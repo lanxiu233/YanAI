@@ -8,6 +8,7 @@ import { DateRangeFilter } from "@/components/date-range-filter";
 import { ImageLightbox } from "@/components/image-lightbox";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { fetchManagedImages, type ManagedImage } from "@/lib/api";
 import { useAuthGuard } from "@/lib/use-auth-guard";
 
@@ -19,28 +20,41 @@ function ImageManagerContent() {
   const [items, setItems] = useState<ManagedImage[]>([]);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [userId, setUserId] = useState("");
+  const [channel, setChannel] = useState("");
   const [lightboxIndex, setLightboxIndex] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
   const [dimensions, setDimensions] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(true);
+  const pageSize = 12;
   const lightboxImages = items.map((item) => ({
     id: item.name,
     src: item.url,
     sizeLabel: formatSize(item.size),
     dimensions: dimensions[item.url],
   }));
-  const pageSize = 12;
-  const pageCount = Math.max(1, Math.ceil(items.length / pageSize));
+  const pageCount = Math.max(1, Math.ceil(total / pageSize));
   const safePage = Math.min(page, pageCount);
-  const currentRows = items.slice((safePage - 1) * pageSize, safePage * pageSize);
+  const currentRows = items;
 
   const loadImages = async () => {
     setIsLoading(true);
     try {
-      const data = await fetchManagedImages({ start_date: startDate, end_date: endDate });
+      const data = await fetchManagedImages({
+        start_date: startDate,
+        end_date: endDate,
+        user_id: userId.trim(),
+        channel: channel.trim(),
+        page,
+        page_size: pageSize,
+      });
       setItems(data.items);
-      setPage(1);
+      setTotal(data.pagination.total);
+      if (data.pagination.page !== page) {
+        setPage(data.pagination.page);
+      }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "加载图片失败");
     } finally {
@@ -51,11 +65,15 @@ function ImageManagerContent() {
   const clearFilters = () => {
     setStartDate("");
     setEndDate("");
+    setUserId("");
+    setChannel("");
+    setPage(1);
   };
 
   useEffect(() => {
     void loadImages();
-  }, [startDate, endDate]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [startDate, endDate, userId, channel, page]);
 
   return (
     <section className="space-y-5">
@@ -65,7 +83,19 @@ function ImageManagerContent() {
           <h1 className="text-2xl font-semibold tracking-tight">图片管理</h1>
         </div>
         <div className="flex flex-wrap gap-2">
-          <DateRangeFilter startDate={startDate} endDate={endDate} onChange={(start, end) => { setStartDate(start); setEndDate(end); }} />
+          <DateRangeFilter startDate={startDate} endDate={endDate} onChange={(start, end) => { setStartDate(start); setEndDate(end); setPage(1); }} />
+          <Input
+            value={userId}
+            onChange={(event) => { setUserId(event.target.value); setPage(1); }}
+            placeholder="用户 ID"
+            className="h-10 w-44 rounded-xl border-stone-200 bg-white"
+          />
+          <Input
+            value={channel}
+            onChange={(event) => { setChannel(event.target.value); setPage(1); }}
+            placeholder="渠道"
+            className="h-10 w-40 rounded-xl border-stone-200 bg-white"
+          />
           <Button variant="outline" onClick={clearFilters} className="h-10 rounded-xl border-stone-200 bg-white px-4 text-stone-700">
             清除筛选条件
           </Button>
@@ -81,7 +111,7 @@ function ImageManagerContent() {
           <div className="flex items-center justify-between border-b border-stone-100 px-5 py-4">
             <div className="flex items-center gap-2 text-sm text-stone-600">
               <ImageIcon className="size-4" />
-              共 {items.length} 张
+              共 {total} 张
             </div>
             <Button variant="ghost" className="h-8 rounded-lg px-3 text-stone-500" onClick={() => void loadImages()} disabled={isLoading}>
               <RefreshCw className={`size-4 ${isLoading ? "animate-spin" : ""}`} />
@@ -90,14 +120,13 @@ function ImageManagerContent() {
           </div>
           <div className="grid gap-0 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {currentRows.map((item, index) => {
-              const imageIndex = items.findIndex((row) => row.url === item.url);
               return (
               <div key={item.url} className="group border-r border-b border-stone-100 p-4 transition hover:bg-stone-50">
                 <button
                   type="button"
                   className="relative block aspect-square w-full cursor-zoom-in overflow-hidden rounded-lg bg-stone-100 text-left"
                   onClick={() => {
-                    setLightboxIndex(imageIndex);
+                    setLightboxIndex(index);
                     setLightboxOpen(true);
                   }}
                 >
@@ -139,12 +168,16 @@ function ImageManagerContent() {
                     <span>{formatSize(item.size)}</span>
                     <span>{dimensions[item.url] || "-"}</span>
                   </div>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="truncate">{item.owner_email || item.owner_name || item.owner_user_id || "系统"}</span>
+                    <span className="shrink-0">{item.channel || "-"}</span>
+                  </div>
                 </div>
               </div>
             )})}
           </div>
           <div className="flex items-center justify-end gap-2 border-t border-stone-100 px-4 py-3 text-sm text-stone-500">
-            <span>第 {safePage} / {pageCount} 页，共 {items.length} 张</span>
+            <span>第 {safePage} / {pageCount} 页，共 {total} 张</span>
             <Button variant="outline" size="icon" className="size-9 rounded-lg border-stone-200 bg-white" disabled={safePage <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))}>
               <ChevronLeft className="size-4" />
             </Button>
@@ -152,7 +185,7 @@ function ImageManagerContent() {
               <ChevronRight className="size-4" />
             </Button>
           </div>
-          {!isLoading && items.length === 0 ? <div className="px-6 py-14 text-center text-sm text-stone-500">没有找到图片</div> : null}
+          {!isLoading && total === 0 ? <div className="px-6 py-14 text-center text-sm text-stone-500">没有找到图片</div> : null}
         </CardContent>
       </Card>
       <ImageLightbox

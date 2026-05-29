@@ -2,14 +2,18 @@ from __future__ import annotations
 
 from services.repositories.sqlalchemy import (
     AccountRow as AccountModel,
+    AuditLogRow as AuditLogModel,
     AuthKeyRow as AuthKeyModel,
     Base,
     ChannelRow as ChannelModel,
     ImageRecordRow as ImageRecordModel,
     PromptLibraryRow as PromptLibraryItemModel,
+    QuotaReservationRow as QuotaReservationModel,
     RedeemCodeRow as RedeemCodeModel,
     SQLAlchemyRepositoryProvider,
     SessionRow as SessionModel,
+    SystemLogRow as SystemLogModel,
+    SystemSettingRow as SystemSettingModel,
     UserRow as UserModel,
 )
 from services.repositories.storage_adapter import RepositoryStorageAdapter
@@ -31,13 +35,17 @@ class DatabaseStorageBackend(RepositoryStorageAdapter):
 
 __all__ = [
     "AccountModel",
+    "AuditLogModel",
     "AuthKeyModel",
     "Base",
     "ChannelModel",
     "DatabaseStorageBackend",
     "ImageRecordModel",
     "PromptLibraryItemModel",
+    "QuotaReservationModel",
     "RedeemCodeModel",
     "SessionModel",
+    "SystemLogModel",
+    "SystemSettingModel",
     "UserModel",
 ]

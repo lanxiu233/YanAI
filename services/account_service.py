@@ -2,11 +2,13 @@ from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import base64
+from dataclasses import dataclass
 import hashlib
 import json
 from threading import Lock
 from typing import Any
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
+import uuid
 
 from curl_cffi.requests import Session
 
@@ -20,6 +22,13 @@ from services.repositories.base import RepositoryProvider
 from services.repositories.storage_adapter import RepositoryStorageAdapter
 from services.storage.base import StorageBackend
 from utils.helper import anonymize_token
+
+
+@dataclass(frozen=True)
+class AccountLease:
+    access_token: str
+    lease_owner: str
+    account: dict[str, Any]
 
 
 class AccountService:
@@ -49,6 +58,48 @@ class AccountService:
     @staticmethod
     def _clean_token(value: Any) -> str:
         return str(value or "").strip()
+
+    @staticmethod
+    def _safe_int(value: Any, default: int = 0) -> int:
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return default
+
+    @staticmethod
+    def _now_utc() -> datetime:
+        return datetime.now(timezone.utc)
+
+    @staticmethod
+    def _format_timestamp(value: datetime) -> str:
+        return value.astimezone(timezone.utc).isoformat()
+
+    @staticmethod
+    def _parse_timestamp(value: Any) -> datetime | None:
+        text = AccountService._clean_token(value)
+        if not text:
+            return None
+        try:
+            parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return parsed.astimezone(timezone.utc)
+
+    @staticmethod
+    def _lease_owners(account: dict[str, Any]) -> list[str]:
+        owners = account.get("lease_owners")
+        if not isinstance(owners, list):
+            return []
+        result: list[str] = []
+        seen: set[str] = set()
+        for owner in owners:
+            value = AccountService._clean_token(owner)
+            if value and value not in seen:
+                seen.add(value)
+                result.append(value)
+        return result
 
     @staticmethod
     def _format_refresh_error(exc: Exception) -> str:
@@ -165,6 +216,12 @@ class AccountService:
         normalized["success"] = int(normalized.get("success") or 0)
         normalized["fail"] = int(normalized.get("fail") or 0)
         normalized["last_used_at"] = normalized.get("last_used_at")
+        normalized["inflight_count"] = max(0, self._safe_int(normalized.get("inflight_count"), 0))
+        normalized["max_concurrency"] = max(1, self._safe_int(normalized.get("max_concurrency"), 1))
+        normalized["lease_owner"] = self._clean_token(normalized.get("lease_owner")) or None
+        normalized["leased_until"] = self._clean_token(normalized.get("leased_until")) or None
+        normalized["lease_owners"] = self._lease_owners(normalized)
+        normalized["updated_at"] = self._clean_token(normalized.get("updated_at")) or None
         return normalized
 
     @staticmethod
@@ -207,6 +264,88 @@ class AccountService:
 
     def _save_accounts(self) -> None:
         self.storage.save_accounts(self._accounts)
+
+    def _account_repository(self):
+        return self.repositories.accounts if self.repositories is not None else None
+
+    def _list_current_accounts(self) -> list[dict]:
+        repo = self._account_repository()
+        if repo is not None:
+            return [normalized for item in repo.list() if (normalized := self._normalize_account(item)) is not None]
+        return [dict(item) for item in self._accounts]
+
+    def _get_current_account(self, access_token: str) -> dict | None:
+        repo = self._account_repository()
+        if repo is not None:
+            getter = getattr(repo, "get_by_access_token", None)
+            if callable(getter):
+                item = getter(access_token)
+                return self._normalize_account(item) if isinstance(item, dict) else None
+        with self._lock:
+            index = self._find_account_index(access_token)
+            if index >= 0:
+                return dict(self._accounts[index])
+        return None
+
+    def _reset_expired_lease(self, account: dict, now: datetime) -> dict:
+        leased_until = self._parse_timestamp(account.get("leased_until"))
+        if leased_until is not None and leased_until > now:
+            return account
+        if int(account.get("inflight_count") or 0) <= 0 and not self._clean_token(account.get("lease_owner")):
+            return account
+        next_account = dict(account)
+        next_account["inflight_count"] = 0
+        next_account["lease_owner"] = None
+        next_account["leased_until"] = None
+        next_account["lease_owners"] = []
+        return next_account
+
+    def _account_selection_key(self, account: dict) -> tuple[float, float, float, float, int]:
+        weight = max(1, self._safe_int(account.get("weight"), 1))
+        max_concurrency = max(1, self._safe_int(account.get("max_concurrency"), 1))
+        inflight_count = max(0, self._safe_int(account.get("inflight_count"), 0))
+        available_slots = max(0, max_concurrency - inflight_count)
+        last_used = self._parse_timestamp(account.get("last_used_at") or account.get("updated_at"))
+        success = max(0, self._safe_int(account.get("success"), 0))
+        fail = max(0, self._safe_int(account.get("fail"), 0))
+        total = success + fail
+        success_rate = success / total if total else 0.5
+        type_rank = {"Pro": 5, "Team": 4, "ProLite": 3, "Plus": 2, "Free": 1}.get(
+            self._clean_token(account.get("type")),
+            0,
+        )
+        return (
+            -float(weight),
+            -float(available_slots),
+            last_used.timestamp() if last_used is not None else 0,
+            -float(success_rate),
+            -type_rank,
+        )
+
+    def _apply_image_result(self, account: dict, success: bool) -> dict:
+        next_item = dict(account)
+        next_item["last_used_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        image_quota_unknown = bool(next_item.get("image_quota_unknown"))
+        if success:
+            next_item["success"] = int(next_item.get("success") or 0) + 1
+            if not image_quota_unknown:
+                next_item["quota"] = max(0, int(next_item.get("quota") or 0) - 1)
+            if not image_quota_unknown and next_item["quota"] == 0:
+                next_item["status"] = "限流"
+                next_item["restore_at"] = next_item.get("restore_at") or None
+            elif next_item.get("status") == "限流":
+                next_item["status"] = "正常"
+        else:
+            next_item["fail"] = int(next_item.get("fail") or 0) + 1
+        next_item["updated_at"] = self._format_timestamp(self._now_utc())
+        return next_item
+
+    def _remove_rate_limited_account_if_configured(self, access_token: str, account: dict | None) -> dict | None:
+        if not account or account.get("status") != "限流" or not config.auto_remove_rate_limited_accounts:
+            return account
+        self.remove_token(access_token)
+        log_service.add(LOG_TYPE_ACCOUNT, "自动移除限流账号", {"token": anonymize_token(access_token)})
+        return None
 
     def _build_remote_headers(self, access_token: str) -> tuple[dict[str, str], str]:
         account = self.get_account(access_token) or {}
@@ -257,14 +396,17 @@ class AccountService:
                 "success": int(account.get("success") or 0),
                 "fail": int(account.get("fail") or 0),
                 "lastUsedAt": account.get("last_used_at"),
+                "inflightCount": int(account.get("inflight_count") or 0),
+                "maxConcurrency": int(account.get("max_concurrency") or 1),
+                "leaseOwner": account.get("lease_owner"),
+                "leasedUntil": account.get("leased_until"),
             }
             for account in accounts
             if (access_token := self._clean_token(account.get("access_token")))
         ]
 
     def list_tokens(self) -> list[str]:
-        with self._lock:
-            return [token for item in self._accounts if (token := self._clean_token(item.get("access_token")))]
+        return [token for item in self._list_current_accounts() if (token := self._clean_token(item.get("access_token")))]
 
     def _list_available_candidate_tokens(self, excluded_tokens: set[str] | None = None) -> list[str]:
         excluded = {self._clean_token(token) for token in (excluded_tokens or set()) if self._clean_token(token)}
@@ -321,12 +463,136 @@ class AccountService:
                 f"status={account.get('status') if account else 'unknown'}"
             )
 
-    def get_text_access_token(self) -> str:
+    def lease_available_account(self, lease_owner: str | None = None, ttl_seconds: int | None = None) -> AccountLease:
+        owner = self._clean_token(lease_owner) or uuid.uuid4().hex
+        ttl = max(1, int(ttl_seconds or config.account_lease_ttl_seconds))
+        repo = self._account_repository()
+        if repo is not None:
+            acquire = getattr(repo, "acquire_image_lease", None)
+            if callable(acquire):
+                account = acquire(owner, ttl)
+                if not account:
+                    raise RuntimeError("no available image quota")
+                normalized = self._normalize_account(account)
+                if normalized is None:
+                    raise RuntimeError("no available image quota")
+                return AccountLease(
+                    access_token=self._clean_token(normalized.get("access_token")),
+                    lease_owner=owner,
+                    account=normalized,
+                )
+        return self._lease_available_account_local(owner, ttl)
+
+    def _lease_available_account_local(self, lease_owner: str, ttl_seconds: int) -> AccountLease:
+        now = self._now_utc()
         with self._lock:
-            for account in self._accounts:
-                status = self._clean_token(account.get("status"))
-                if status not in {"禁用", "异常"}:
-                    return self._clean_token(account.get("access_token"))
+            candidates: list[tuple[tuple[float, float, float, float, int], int, dict]] = []
+            changed = False
+            for index, item in enumerate(self._accounts):
+                account = self._normalize_account(item)
+                if account is None:
+                    continue
+                account = self._reset_expired_lease(account, now)
+                if account != item:
+                    self._accounts[index] = account
+                    changed = True
+                if not self._is_image_account_available(account):
+                    continue
+                max_concurrency = max(1, int(account.get("max_concurrency") or 1))
+                inflight_count = max(
+                    int(account.get("inflight_count") or 0),
+                    len(self._lease_owners(account)),
+                )
+                if inflight_count >= max_concurrency:
+                    continue
+                account["inflight_count"] = inflight_count
+                candidates.append((self._account_selection_key(account), index, account))
+
+            if not candidates:
+                if changed:
+                    self._save_accounts()
+                raise RuntimeError("no available image quota")
+
+            _, index, account = min(candidates, key=lambda candidate: (candidate[0], candidate[1]))
+            owners = self._lease_owners(account)
+            if lease_owner not in owners:
+                owners.append(lease_owner)
+            account["lease_owners"] = owners
+            account["inflight_count"] = len(owners)
+            account["lease_owner"] = owners[0] if owners else None
+            account["leased_until"] = self._format_timestamp(now + timedelta(seconds=ttl_seconds))
+            account["updated_at"] = self._format_timestamp(now)
+            self._accounts[index] = account
+            self._save_accounts()
+            return AccountLease(
+                access_token=self._clean_token(account.get("access_token")),
+                lease_owner=lease_owner,
+                account=dict(account),
+            )
+
+    def release_image_account(self, lease: AccountLease, success: bool | None = None) -> dict | None:
+        access_token = self._clean_token(lease.access_token)
+        lease_owner = self._clean_token(lease.lease_owner)
+        if not access_token:
+            return None
+        repo = self._account_repository()
+        if repo is not None:
+            release = getattr(repo, "release_image_lease", None)
+            if callable(release):
+                updated = release(access_token, lease_owner, success=success)
+                account = self._normalize_account(updated) if isinstance(updated, dict) else None
+                return self._remove_rate_limited_account_if_configured(access_token, account)
+        return self._release_image_account_local(access_token, lease_owner, success)
+
+    def _release_image_account_local(self, access_token: str, lease_owner: str, success: bool | None) -> dict | None:
+        now = self._now_utc()
+        with self._lock:
+            index = self._find_account_index(access_token)
+            if index < 0:
+                return None
+            account = dict(self._accounts[index])
+            if success is not None:
+                account = self._apply_image_result(account, success)
+            owners = self._lease_owners(account)
+            previous_inflight = max(int(account.get("inflight_count") or 0), len(owners))
+            removed_owner = False
+            if lease_owner and lease_owner in owners:
+                owners.remove(lease_owner)
+                removed_owner = True
+            elif not owners and int(account.get("inflight_count") or 0) > 0:
+                account["inflight_count"] = max(0, int(account.get("inflight_count") or 0) - 1)
+            account["lease_owners"] = owners
+            if owners:
+                account["inflight_count"] = len(owners)
+            elif removed_owner:
+                account["inflight_count"] = max(0, previous_inflight - 1)
+            else:
+                account["inflight_count"] = int(account.get("inflight_count") or 0)
+            if account["inflight_count"] <= 0:
+                account["inflight_count"] = 0
+                account["lease_owner"] = None
+                account["leased_until"] = None
+                account["lease_owners"] = []
+            else:
+                account["lease_owner"] = owners[0] if owners else account.get("lease_owner")
+            account["updated_at"] = self._format_timestamp(now)
+            normalized = self._normalize_account(account)
+            if normalized is None:
+                return None
+            if normalized.get("status") == "限流" and config.auto_remove_rate_limited_accounts:
+                del self._accounts[index]
+                self._save_accounts()
+                log_service.add(LOG_TYPE_ACCOUNT, "自动移除限流账号", {"token": anonymize_token(access_token)})
+                return None
+            self._accounts[index] = normalized
+            self._save_accounts()
+            return dict(normalized)
+
+    def get_text_access_token(self) -> str:
+        for account in self._list_current_accounts():
+            status = self._clean_token(account.get("status"))
+            if status not in {"禁用", "异常"}:
+                return self._clean_token(account.get("access_token"))
         return ""
 
     def remove_invalid_token(self, access_token: str, event: str) -> bool:
@@ -341,47 +607,69 @@ class AccountService:
         return self.get_available_access_token()
 
     def has_available_account(self) -> bool:
-        with self._lock:
-            return any(self._is_image_account_available(item) for item in self._accounts)
+        now = self._now_utc()
+        for item in self._list_current_accounts():
+            account = self._reset_expired_lease(item, now)
+            if not self._is_image_account_available(account):
+                continue
+            if int(account.get("inflight_count") or 0) < int(account.get("max_concurrency") or 1):
+                return True
+        return False
 
     def get_account(self, access_token: str) -> dict | None:
         access_token = self._clean_token(access_token)
         if not access_token:
             return None
-        with self._lock:
-            index = self._find_account_index(access_token)
-            if index >= 0:
-                return dict(self._accounts[index])
-        return None
+        return self._get_current_account(access_token)
 
     def list_accounts(self) -> list[dict]:
-        with self._lock:
-            return self._public_items(self._accounts)
+        return self._public_items(self._list_current_accounts())
 
     def export_accounts(self, access_tokens: list[str]) -> dict[str, Any]:
         target_tokens = self._clean_tokens(access_tokens)
         target_set = set(target_tokens)
-        with self._lock:
-            items = [
-                dict(account)
-                for account in self._accounts
-                if self._clean_token(account.get("access_token")) in target_set
-            ]
+        items = [
+            dict(account)
+            for account in self._list_current_accounts()
+            if self._clean_token(account.get("access_token")) in target_set
+        ]
         return {"items": items, "count": len(items)}
 
     def list_limited_tokens(self) -> list[str]:
-        with self._lock:
-            return [
-                token
-                for item in self._accounts
-                if item.get("status") == "限流"
-                   and (token := self._clean_token(item.get("access_token")))
-            ]
+        return [
+            token
+            for item in self._list_current_accounts()
+            if item.get("status") == "限流"
+               and (token := self._clean_token(item.get("access_token")))
+        ]
 
     def add_accounts(self, tokens: list[str]) -> dict:
         cleaned_tokens = self._clean_tokens(tokens)
         if not cleaned_tokens:
             return {"added": 0, "skipped": 0, "items": self.list_accounts()}
+
+        repo = self._account_repository()
+        if repo is not None:
+            added = 0
+            skipped = 0
+            for access_token in cleaned_tokens:
+                current = self._get_current_account(access_token)
+                if current is None:
+                    added += 1
+                    current = {}
+                else:
+                    skipped += 1
+                account = self._normalize_account(
+                    {
+                        **current,
+                        "access_token": access_token,
+                        "type": str(current.get("type") or "Free"),
+                    }
+                )
+                if account is not None:
+                    repo.upsert(account)
+            log_service.add(LOG_TYPE_ACCOUNT, f"新增 {added} 个账号，跳过 {skipped} 个", {"added": added, "skipped": skipped})
+            return {"added": added, "skipped": skipped, "items": self.list_accounts()}
 
         with self._lock:
             indexed = {self._clean_token(item.get("access_token")): dict(item) for item in self._accounts}
@@ -424,6 +712,31 @@ class AccountService:
         if not normalized_inputs:
             return {"added": 0, "skipped": 0, "items": self.list_accounts()}
 
+        repo = self._account_repository()
+        if repo is not None:
+            added = 0
+            skipped = 0
+            for item in normalized_inputs:
+                access_token = self._clean_token(item.get("access_token"))
+                current = self._get_current_account(access_token)
+                if current is None:
+                    added += 1
+                    current = {}
+                else:
+                    skipped += 1
+                account = self._normalize_account(
+                    {
+                        **current,
+                        **item,
+                        "access_token": access_token,
+                        "type": str(item.get("type") or current.get("type") or "Free"),
+                    }
+                )
+                if account is not None:
+                    repo.upsert(account)
+            log_service.add(LOG_TYPE_ACCOUNT, f"新增 {added} 个账号元数据，跳过 {skipped} 个", {"added": added, "skipped": skipped})
+            return {"added": added, "skipped": skipped, "items": self.list_accounts()}
+
         with self._lock:
             indexed = {self._clean_token(item.get("access_token")): dict(item) for item in self._accounts}
             added = 0
@@ -456,6 +769,12 @@ class AccountService:
         target_set = set(self._clean_tokens(tokens))
         if not target_set:
             return {"removed": 0, "items": self.list_accounts()}
+        repo = self._account_repository()
+        if repo is not None:
+            removed = sum(1 for token in target_set if repo.delete(token))
+            if removed:
+                log_service.add(LOG_TYPE_ACCOUNT, f"删除 {removed} 个账号", {"removed": removed})
+            return {"removed": removed, "items": self.list_accounts()}
         with self._lock:
             before = len(self._accounts)
             self._accounts = [item for item in self._accounts if
@@ -478,6 +797,21 @@ class AccountService:
         access_token = self._clean_token(access_token)
         if not access_token:
             return None
+        repo = self._account_repository()
+        if repo is not None:
+            current = self._get_current_account(access_token)
+            if current is None:
+                return None
+            account = self._normalize_account({**current, **updates, "access_token": access_token})
+            if account is None:
+                return None
+            if account.get("status") == "限流" and config.auto_remove_rate_limited_accounts:
+                repo.delete(access_token)
+                log_service.add(LOG_TYPE_ACCOUNT, "自动移除限流账号", {"token": anonymize_token(access_token)})
+                return None
+            repo.upsert(account)
+            log_service.add(LOG_TYPE_ACCOUNT, "更新账号", {"token": anonymize_token(access_token), "status": account.get("status")})
+            return dict(account)
         with self._lock:
             index = self._find_account_index(access_token)
             if index < 0:
@@ -500,24 +834,18 @@ class AccountService:
         access_token = self._clean_token(access_token)
         if not access_token:
             return None
+        repo = self._account_repository()
+        if repo is not None:
+            recorder = getattr(repo, "record_image_result", None)
+            if callable(recorder):
+                updated = recorder(access_token, success)
+                account = self._normalize_account(updated) if isinstance(updated, dict) else None
+                return self._remove_rate_limited_account_if_configured(access_token, account)
         with self._lock:
             index = self._find_account_index(access_token)
             if index < 0:
                 return None
-            next_item = dict(self._accounts[index])
-            next_item["last_used_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            image_quota_unknown = bool(next_item.get("image_quota_unknown"))
-            if success:
-                next_item["success"] = int(next_item.get("success") or 0) + 1
-                if not image_quota_unknown:
-                    next_item["quota"] = max(0, int(next_item.get("quota") or 0) - 1)
-                if not image_quota_unknown and next_item["quota"] == 0:
-                    next_item["status"] = "限流"
-                    next_item["restore_at"] = next_item.get("restore_at") or None
-                elif next_item.get("status") == "限流":
-                    next_item["status"] = "正常"
-            else:
-                next_item["fail"] = int(next_item.get("fail") or 0) + 1
+            next_item = self._apply_image_result(dict(self._accounts[index]), success)
             account = self._normalize_account(next_item)
             if account is None:
                 return None

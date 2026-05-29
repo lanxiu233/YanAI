@@ -6,9 +6,9 @@ import unittest
 
 import requests
 
-from test.utils import save_image
+from test.utils import load_auth_key, save_image
 
-AUTH_KEY = "chatgpt2api"
+AUTH_KEY = load_auth_key()
 BASE_URL = "http://localhost:8000"
 TEXT_MODEL = "auto"
 IMAGE_MODEL = "gpt-image-2"

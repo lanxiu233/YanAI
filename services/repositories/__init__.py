@@ -1,31 +1,37 @@
 from services.repositories.base import (
     AccountRepository,
+    AuditLogRepository,
     AuthKeyRepository,
     ChannelRepository,
     DatasetRepository,
     ImageRecordRepository,
     PromptRepository,
+    QuotaReservationRepository,
     RedeemCodeRepository,
     RepositoryProvider,
     RepositoryValidationError,
     SessionRepository,
     SystemConfigRepository,
+    SystemLogRepository,
     UserRepository,
 )
 from services.repositories.sqlalchemy import SQLAlchemyRepositoryProvider
 
 __all__ = [
     "AccountRepository",
+    "AuditLogRepository",
     "AuthKeyRepository",
     "ChannelRepository",
     "DatasetRepository",
     "ImageRecordRepository",
     "PromptRepository",
+    "QuotaReservationRepository",
     "RedeemCodeRepository",
     "RepositoryProvider",
     "RepositoryValidationError",
     "SQLAlchemyRepositoryProvider",
     "SessionRepository",
     "SystemConfigRepository",
+    "SystemLogRepository",
     "UserRepository",
 ]

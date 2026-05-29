@@ -9,8 +9,9 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from api import accounts, ai, prompts, register, system, users
-from api.support import resolve_web_asset, start_limited_account_watcher
+from api.support import resolve_web_asset, start_limited_account_watcher, start_quota_reservation_watcher
 from services.config import config
+from services.observability import normalize_request_id, request_id_context
 
 
 def create_app() -> FastAPI:
@@ -19,13 +20,15 @@ def create_app() -> FastAPI:
     @asynccontextmanager
     async def lifespan(_: FastAPI):
         stop_event = Event()
-        thread = start_limited_account_watcher(stop_event)
+        limited_thread = start_limited_account_watcher(stop_event)
+        quota_thread = start_quota_reservation_watcher(stop_event)
         config.cleanup_old_images()
         try:
             yield
         finally:
             stop_event.set()
-            thread.join(timeout=1)
+            limited_thread.join(timeout=1)
+            quota_thread.join(timeout=1)
 
     app = FastAPI(title="chatgpt2api", version=app_version, lifespan=lifespan)
     app.add_middleware(
@@ -35,6 +38,15 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    @app.middleware("http")
+    async def request_id_middleware(request, call_next):
+        with request_id_context(normalize_request_id(request.headers.get("x-request-id"))) as request_id:
+            request.state.request_id = request_id
+            response = await call_next(request)
+            response.headers["x-request-id"] = request_id
+            return response
+
     app.include_router(ai.create_router())
     app.include_router(accounts.create_router())
     app.include_router(prompts.create_router())

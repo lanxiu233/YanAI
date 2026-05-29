@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CalendarDays, Copy, ImageIcon, LoaderCircle, Maximize2, RefreshCw } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, Copy, ImageIcon, LoaderCircle, Maximize2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 
 import { DateRangeFilter } from "@/components/date-range-filter";
@@ -22,7 +22,12 @@ function MyImagesContent() {
   const [endDate, setEndDate] = useState("");
   const [lightboxIndex, setLightboxIndex] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  const pageSize = 12;
+  const pageCount = Math.max(1, Math.ceil(total / pageSize));
+  const safePage = Math.min(page, pageCount);
 
   const lightboxImages = items.map((item) => ({
     id: item.name,
@@ -33,8 +38,12 @@ function MyImagesContent() {
   const loadImages = async () => {
     setIsLoading(true);
     try {
-      const data = await fetchMyImages({ start_date: startDate, end_date: endDate });
+      const data = await fetchMyImages({ start_date: startDate, end_date: endDate, page, page_size: pageSize });
       setItems(data.items);
+      setTotal(data.pagination.total);
+      if (data.pagination.page !== page) {
+        setPage(data.pagination.page);
+      }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "加载图片失败");
     } finally {
@@ -45,7 +54,7 @@ function MyImagesContent() {
   useEffect(() => {
     void loadImages();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [startDate, endDate]);
+  }, [startDate, endDate, page]);
 
   return (
     <section className="space-y-5">
@@ -55,8 +64,8 @@ function MyImagesContent() {
           <h1 className="text-2xl font-semibold tracking-tight">我的图片</h1>
         </div>
         <div className="flex flex-wrap gap-2">
-          <DateRangeFilter startDate={startDate} endDate={endDate} onChange={(start, end) => { setStartDate(start); setEndDate(end); }} />
-          <Button variant="outline" onClick={() => { setStartDate(""); setEndDate(""); }} className="h-10 rounded-xl border-rose-100 bg-white px-4 text-stone-700">
+          <DateRangeFilter startDate={startDate} endDate={endDate} onChange={(start, end) => { setStartDate(start); setEndDate(end); setPage(1); }} />
+          <Button variant="outline" onClick={() => { setStartDate(""); setEndDate(""); setPage(1); }} className="h-10 rounded-xl border-rose-100 bg-white px-4 text-stone-700">
             清除筛选
           </Button>
           <Button onClick={() => void loadImages()} disabled={isLoading} className="h-10 rounded-xl bg-rose-500 px-4 text-white hover:bg-rose-600">
@@ -70,7 +79,7 @@ function MyImagesContent() {
         <CardContent className="p-0">
           <div className="flex items-center gap-2 border-b border-rose-50 px-5 py-4 text-sm text-stone-600">
             <ImageIcon className="size-4 text-rose-500" />
-            共 {items.length} 张
+            共 {total} 张
           </div>
           {isLoading ? (
             <div className="flex h-56 items-center justify-center">
@@ -119,6 +128,17 @@ function MyImagesContent() {
               ))}
             </div>
           )}
+          {!isLoading && total > 0 ? (
+            <div className="flex items-center justify-end gap-2 border-t border-rose-50 px-4 py-3 text-sm text-stone-500">
+              <span>第 {safePage} / {pageCount} 页，共 {total} 张</span>
+              <Button variant="outline" size="icon" className="size-9 rounded-lg border-rose-100 bg-white" disabled={safePage <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))}>
+                <ChevronLeft className="size-4" />
+              </Button>
+              <Button variant="outline" size="icon" className="size-9 rounded-lg border-rose-100 bg-white" disabled={safePage >= pageCount} onClick={() => setPage((value) => Math.min(pageCount, value + 1))}>
+                <ChevronRight className="size-4" />
+              </Button>
+            </div>
+          ) : null}
         </CardContent>
       </Card>
       <ImageLightbox

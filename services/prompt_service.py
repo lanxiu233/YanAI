@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 import hashlib
 import json
 from pathlib import Path
+from threading import RLock
 import uuid
 from typing import Any
 
@@ -136,6 +137,7 @@ class PromptLibraryService:
         self.storage = RepositoryStorageAdapter(storage) if isinstance(storage, RepositoryProvider) else storage
         self.bootstrap_paths = bootstrap_paths
         self.assets_dir = assets_dir or config.prompt_assets_dir
+        self._lock = RLock()
         self._items = self._load_items()
 
     def _load_items(self) -> list[dict[str, Any]]:
@@ -195,8 +197,14 @@ class PromptLibraryService:
     def _save(self) -> None:
         self.storage.save_prompt_library(self._items)
 
-    def list_prompts(self) -> list[dict[str, Any]]:
+    def _current_items(self) -> list[dict[str, Any]]:
+        if self.repositories is not None:
+            self._items = self._load_items()
         return [dict(item) for item in self._items]
+
+    def list_prompts(self) -> list[dict[str, Any]]:
+        with self._lock:
+            return self._current_items()
 
     def create_prompt(self, payload: dict[str, Any]) -> dict[str, Any]:
         item = _normalize_prompt({**payload, "id": uuid.uuid4().hex[:16]}, generated_id=False)
@@ -205,56 +213,73 @@ class PromptLibraryService:
         now = _now_iso()
         item["created"] = item.get("created") or now
         item["updated_at"] = now
-        self._items = [item, *self._items]
-        self._save()
+        with self._lock:
+            if self.repositories is not None:
+                self.repositories.prompts.upsert(dict(item))
+                self._items = self._load_items()
+            else:
+                self._items = [item, *self._items]
+                self._save()
         return dict(item)
 
     def update_prompt(self, prompt_id: str, payload: dict[str, Any]) -> dict[str, Any] | None:
         normalized_id = _clean(prompt_id)
         if not normalized_id:
             return None
-        for index, current in enumerate(self._items):
-            if current.get("id") != normalized_id:
-                continue
-            candidate = dict(current)
-            for key in (
-                "title",
-                "description",
-                "preview",
-                "reference_image_urls",
-                "prompt",
-                "author",
-                "link",
-                "mode",
-                "image_size",
-                "image_count",
-                "icon",
-                "quick_access",
-                "sort_order",
-                "category",
-                "sub_category",
-            ):
-                if key in payload:
-                    candidate[key] = payload.get(key)
-            candidate["updated_at"] = _now_iso()
-            item = _normalize_prompt(candidate)
-            if item is None:
-                raise ValueError("title and prompt are required")
-            self._items[index] = item
-            self._save()
-            return dict(item)
+        with self._lock:
+            items = self._current_items()
+            for index, current in enumerate(items):
+                if current.get("id") != normalized_id:
+                    continue
+                candidate = dict(current)
+                for key in (
+                    "title",
+                    "description",
+                    "preview",
+                    "reference_image_urls",
+                    "prompt",
+                    "author",
+                    "link",
+                    "mode",
+                    "image_size",
+                    "image_count",
+                    "icon",
+                    "quick_access",
+                    "sort_order",
+                    "category",
+                    "sub_category",
+                ):
+                    if key in payload:
+                        candidate[key] = payload.get(key)
+                candidate["updated_at"] = _now_iso()
+                item = _normalize_prompt(candidate)
+                if item is None:
+                    raise ValueError("title and prompt are required")
+                if self.repositories is not None:
+                    self.repositories.prompts.upsert(dict(item))
+                    self._items = self._load_items()
+                else:
+                    self._items[index] = item
+                    self._save()
+                return dict(item)
         return None
 
     def delete_prompt(self, prompt_id: str) -> bool:
         normalized_id = _clean(prompt_id)
         if not normalized_id:
             return False
-        before = len(self._items)
-        self._items = [item for item in self._items if item.get("id") != normalized_id]
-        if len(self._items) == before:
-            return False
-        self._save()
-        return True
+        with self._lock:
+            if self.repositories is not None:
+                removed = self.repositories.prompts.delete(normalized_id)
+                if removed:
+                    self._items = self._load_items()
+                return removed
+            before = len(self._items)
+            self._items = [item for item in self._items if item.get("id") != normalized_id]
+            if len(self._items) == before:
+                return False
+            self._save()
+            return True
 
     def save_asset(self, data: bytes, *, filename: str = "", content_type: str = "") -> str:
         if not data:

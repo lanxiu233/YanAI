@@ -74,6 +74,8 @@ npm run dev
 - `postgres` - 外部 PostgreSQL（需配置 `DATABASE_URL`）
 - `git` - Git 私有仓库（需配置 `GIT_REPO_URL` 和 `GIT_TOKEN`）
 
+多人稳定并发部署建议使用 `postgres`。`sqlite` 适合本地开发和轻量验证；`json` / `git` 更适合单实例低并发、备份导入导出或过渡场景，不建议作为多人生产并发的主存储。
+
 示例：使用 PostgreSQL
 ```yaml
 environment:
@@ -155,6 +157,18 @@ python scripts/migrate_storage.py --from json --to postgres --verify-only
 - 支持个人用户注册、登录、兑换码领取额度，以及个人图片记录查看
 - 支持 OpenAI 图片兼容渠道管理，可设置 Base URL、API Key、模型、权重、优先级和超时时间
 - 支持系统日志查看、图片访问地址配置、自动清理天数、账号刷新间隔和模型映射配置
+
+### 多用户稳定并发改造
+
+当前仓库已经完成多用户稳定并发改造，核心依赖数据库事务、行级写入、租约和请求追踪。
+
+- 存储层拆分为 Repository 边界，并保留兼容旧 Storage API 的适配器；数据库后端覆盖账号、管理员密钥、用户、会话、兑换码、渠道、提示词库、图片记录、额度预留、系统配置、系统日志和审计日志等数据集
+- 数据迁移和安全保护覆盖完整业务数据，提供只读审计、备份恢复、迁移预演、迁移校验和重复主键检查，支持从旧 JSON 数据迁移到 SQLite / PostgreSQL
+- 普通用户图片额度改为请求级预扣：任务开始前按 `request_id` 预留额度，成功后按实际生成数量确认，失败或无结果时释放，过期预留由后台 watcher 返还；管理员调用不占用个人额度
+- 账号池改为图片任务租约模型，支持 `max_concurrency`、`inflight_count`、`lease_owner`、`lease_owners` 和 `leased_until`，租用成功后再调用上游，结束时释放并更新成功、失败、额度和限流状态；PostgreSQL 下会使用行级锁避免多个任务抢占同一账号
+- 图片记录改为逐条插入并使用 UUID 记录 ID，支持按用户、日期、渠道和 `request_id` 分页查询，避免多人同时生成图片时整表覆盖导致记录丢失
+- 兑换码兑换、渠道更新、提示词新增和系统设置已接入数据库 Repository：单次兑换码并发兑换只能成功一次，不同渠道或提示词的并发管理操作不会互相覆盖
+- 请求链路加入 `x-request-id` / `request_id`，贯穿 API 调用、额度预留、账号租约、图片记录、系统日志和审计日志；`/api/storage/info` 和健康检查可查看当前存储后端与数据集状态
 
 ### 注册机邮箱 Provider
 

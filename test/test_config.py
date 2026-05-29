@@ -1,7 +1,11 @@
 import json
+import os
 import tempfile
+import time
 import unittest
+from datetime import datetime, timezone
 from pathlib import Path
+from types import SimpleNamespace
 
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
@@ -100,6 +104,43 @@ class ConfigLoadingTests(unittest.TestCase):
 
             self.assertEqual(store.smtp_password, "smtp-secret")
             self.assertEqual(store.linuxdo_client_secret, "linuxdo-secret")
+
+    def test_cleanup_old_images_keeps_recent_recorded_files_and_removes_old_orphans(self) -> None:
+        module = self.config_module
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            base_dir = Path(tmp_dir)
+            data_dir = base_dir / "data"
+            config_path = base_dir / "config.json"
+            config_path.write_text(json.dumps({"auth-key": "test-auth", "image_retention_days": 30}), encoding="utf-8")
+            old_data_dir = module.DATA_DIR
+            try:
+                module.DATA_DIR = data_dir
+                store = module.ConfigStore(config_path)
+                keep = data_dir / "images" / "2026" / "05" / "29" / "keep.png"
+                orphan = data_dir / "images" / "2026" / "05" / "01" / "orphan.png"
+                keep.parent.mkdir(parents=True)
+                orphan.parent.mkdir(parents=True)
+                keep.write_bytes(b"keep")
+                orphan.write_bytes(b"orphan")
+                old_timestamp = time.time() - 40 * 86400
+                os.utime(keep, (old_timestamp, old_timestamp))
+                os.utime(orphan, (old_timestamp, old_timestamp))
+                store._storage_backend = SimpleNamespace(
+                    load_image_records=lambda: [
+                        {
+                            "url": "http://127.0.0.1:8000/images/2026/05/29/keep.png",
+                            "created_at": datetime.now(timezone.utc).isoformat(),
+                        }
+                    ]
+                )
+
+                removed = store.cleanup_old_images()
+
+                self.assertEqual(removed, 1)
+                self.assertTrue(keep.exists())
+                self.assertFalse(orphan.exists())
+            finally:
+                module.DATA_DIR = old_data_dir
 
 
 if __name__ == "__main__":

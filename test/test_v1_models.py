@@ -5,10 +5,11 @@ import unittest
 
 import requests
 
+from test.utils import load_auth_key
 from services.protocol import openai_v1_models
 
 
-AUTH_KEY = "chatgpt2api"
+AUTH_KEY = load_auth_key()
 BASE_URL = "http://localhost:8000"
 
 

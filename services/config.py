@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
 import json
 import os
 import sys
 from pathlib import Path
 import time
+from urllib.parse import urlparse
 
 from services.storage.base import StorageBackend
 from services.repositories.base import RepositoryProvider
@@ -14,6 +16,8 @@ BASE_DIR = Path(__file__).resolve().parents[1]
 DATA_DIR = BASE_DIR / "data"
 CONFIG_FILE = BASE_DIR / "config.json"
 VERSION_FILE = BASE_DIR / "VERSION"
+SYSTEM_SETTING_SECRET_KEYS = {"auth-key", "smtp_password", "linuxdo_client_secret"}
+SYSTEM_SETTING_TRANSIENT_KEYS = {"smtp_password_set", "linuxdo_client_secret_set"}
 
 
 @dataclass(frozen=True)
@@ -54,6 +58,26 @@ def _clean_list(value: object) -> list[str]:
         seen.add(text)
         items.append(text)
     return items
+
+
+def _parse_timestamp(value: object) -> float | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.timestamp()
+
+
+def _image_relative_path(url: object) -> str:
+    parsed_path = urlparse(str(url or "").strip()).path
+    if not parsed_path.startswith("/images/"):
+        return ""
+    return parsed_path.removeprefix("/images/").strip("/")
 
 
 def _read_json_object(path: Path, *, name: str) -> dict[str, object]:
@@ -99,6 +123,7 @@ class ConfigStore:
         DATA_DIR.mkdir(parents=True, exist_ok=True)
         self.data = self._load()
         self._storage_backend: StorageBackend | None = None
+        self._system_settings_seeded = False
         if _is_invalid_auth_key(self.auth_key):
             raise ValueError(
                 "❌ auth-key 未设置！\n"
@@ -115,6 +140,43 @@ class ConfigStore:
     def _save(self) -> None:
         self.path.write_text(json.dumps(self.data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
+    def _provider_if_initialized(self) -> RepositoryProvider | None:
+        if self._storage_backend is None:
+            return None
+        provider = getattr(self._storage_backend, "repository_provider", None)
+        if not isinstance(provider, RepositoryProvider):
+            return None
+        self._ensure_system_settings_seeded(provider)
+        return provider
+
+    def _ensure_system_settings_seeded(self, provider: RepositoryProvider) -> None:
+        if self._system_settings_seeded:
+            return
+        try:
+            existing = provider.system_config.list_settings()
+            for key, value in self.data.items():
+                if key in SYSTEM_SETTING_SECRET_KEYS or key in SYSTEM_SETTING_TRANSIENT_KEYS:
+                    continue
+                if key not in existing:
+                    provider.system_config.set_setting(key, value)
+            self._system_settings_seeded = True
+        except Exception:
+            return
+
+    def _effective_data(self) -> dict[str, object]:
+        data = dict(self.data)
+        provider = self._provider_if_initialized()
+        if provider is None:
+            return data
+        try:
+            data.update(provider.system_config.list_settings())
+        except Exception:
+            pass
+        return data
+
+    def _get_config_value(self, key: str, default: object = None) -> object:
+        return self._effective_data().get(key, default)
+
     @property
     def auth_key(self) -> str:
         return _normalize_auth_key(os.getenv("CHATGPT2API_AUTH_KEY") or self.data.get("auth-key"))
@@ -126,28 +188,35 @@ class ConfigStore:
     @property
     def refresh_account_interval_minute(self) -> int:
         try:
-            return int(self.data.get("refresh_account_interval_minute", 5))
+            return int(self._get_config_value("refresh_account_interval_minute", 5))
         except (TypeError, ValueError):
             return 5
 
     @property
+    def account_lease_ttl_seconds(self) -> int:
+        try:
+            return max(60, int(self._get_config_value("account_lease_ttl_seconds", 1800)))
+        except (TypeError, ValueError):
+            return 1800
+
+    @property
     def image_retention_days(self) -> int:
         try:
-            return max(1, int(self.data.get("image_retention_days", 30)))
+            return max(1, int(self._get_config_value("image_retention_days", 30)))
         except (TypeError, ValueError):
             return 30
 
     @property
     def auto_remove_invalid_accounts(self) -> bool:
-        return _bool(self.data.get("auto_remove_invalid_accounts"), False)
+        return _bool(self._get_config_value("auto_remove_invalid_accounts"), False)
 
     @property
     def auto_remove_rate_limited_accounts(self) -> bool:
-        return _bool(self.data.get("auto_remove_rate_limited_accounts"), False)
+        return _bool(self._get_config_value("auto_remove_rate_limited_accounts"), False)
 
     @property
     def log_levels(self) -> list[str]:
-        levels = self.data.get("log_levels")
+        levels = self._get_config_value("log_levels")
         if not isinstance(levels, list):
             return []
         allowed = {"debug", "info", "warning", "error"}
@@ -155,45 +224,45 @@ class ConfigStore:
 
     @property
     def allow_user_registration(self) -> bool:
-        return _bool(self.data.get("allow_user_registration"), True)
+        return _bool(self._get_config_value("allow_user_registration"), True)
 
     @property
     def new_user_initial_quota(self) -> int:
         try:
-            return max(0, int(self.data.get("new_user_initial_quota", 0)))
+            return max(0, int(self._get_config_value("new_user_initial_quota", 0)))
         except (TypeError, ValueError):
             return 0
 
     @property
     def email_verification_enabled(self) -> bool:
-        return _bool(self.data.get("email_verification_enabled"), False)
+        return _bool(self._get_config_value("email_verification_enabled"), False)
 
     @property
     def email_domain_whitelist_enabled(self) -> bool:
-        return _bool(self.data.get("email_domain_whitelist_enabled"), False)
+        return _bool(self._get_config_value("email_domain_whitelist_enabled"), False)
 
     @property
     def email_alias_restriction_enabled(self) -> bool:
-        return _bool(self.data.get("email_alias_restriction_enabled"), False)
+        return _bool(self._get_config_value("email_alias_restriction_enabled"), False)
 
     @property
     def email_domain_whitelist(self) -> list[str]:
-        return _clean_list(self.data.get("email_domain_whitelist"))
+        return _clean_list(self._get_config_value("email_domain_whitelist"))
 
     @property
     def smtp_host(self) -> str:
-        return str(os.getenv("CHATGPT2API_SMTP_HOST") or self.data.get("smtp_host") or "").strip()
+        return str(os.getenv("CHATGPT2API_SMTP_HOST") or self._get_config_value("smtp_host") or "").strip()
 
     @property
     def smtp_port(self) -> int:
         try:
-            return max(1, int(os.getenv("CHATGPT2API_SMTP_PORT") or self.data.get("smtp_port") or 587))
+            return max(1, int(os.getenv("CHATGPT2API_SMTP_PORT") or self._get_config_value("smtp_port") or 587))
         except (TypeError, ValueError):
             return 587
 
     @property
     def smtp_username(self) -> str:
-        return str(os.getenv("CHATGPT2API_SMTP_USERNAME") or self.data.get("smtp_username") or "").strip()
+        return str(os.getenv("CHATGPT2API_SMTP_USERNAME") or self._get_config_value("smtp_username") or "").strip()
 
     @property
     def smtp_password(self) -> str:
@@ -201,27 +270,27 @@ class ConfigStore:
 
     @property
     def smtp_from_email(self) -> str:
-        return str(os.getenv("CHATGPT2API_SMTP_FROM") or self.data.get("smtp_from_email") or self.smtp_username).strip()
+        return str(os.getenv("CHATGPT2API_SMTP_FROM") or self._get_config_value("smtp_from_email") or self.smtp_username).strip()
 
     @property
     def smtp_use_ssl(self) -> bool:
-        return _bool(self.data.get("smtp_use_ssl"), self.smtp_port == 465)
+        return _bool(self._get_config_value("smtp_use_ssl"), self.smtp_port == 465)
 
     @property
     def smtp_use_starttls(self) -> bool:
-        return _bool(self.data.get("smtp_use_starttls"), not self.smtp_use_ssl)
+        return _bool(self._get_config_value("smtp_use_starttls"), not self.smtp_use_ssl)
 
     @property
     def smtp_force_auth_login(self) -> bool:
-        return _bool(self.data.get("smtp_force_auth_login"), False)
+        return _bool(self._get_config_value("smtp_force_auth_login"), False)
 
     @property
     def linuxdo_oauth_enabled(self) -> bool:
-        return _bool(self.data.get("linuxdo_oauth_enabled"), False)
+        return _bool(self._get_config_value("linuxdo_oauth_enabled"), False)
 
     @property
     def linuxdo_client_id(self) -> str:
-        return str(os.getenv("LINUX_DO_CLIENT_ID") or self.data.get("linuxdo_client_id") or "").strip()
+        return str(os.getenv("LINUX_DO_CLIENT_ID") or self._get_config_value("linuxdo_client_id") or "").strip()
 
     @property
     def linuxdo_client_secret(self) -> str:
@@ -230,7 +299,7 @@ class ConfigStore:
     @property
     def linuxdo_minimum_trust_level(self) -> int:
         try:
-            return max(0, min(4, int(self.data.get("linuxdo_minimum_trust_level", 0))))
+            return max(0, min(4, int(self._get_config_value("linuxdo_minimum_trust_level", 0))))
         except (TypeError, ValueError):
             return 0
 
@@ -248,9 +317,22 @@ class ConfigStore:
 
     def cleanup_old_images(self) -> int:
         cutoff = time.time() - self.image_retention_days * 86400
+        record_times = self._image_record_file_times()
         removed = 0
         for path in self.images_dir.rglob("*"):
-            if path.is_file() and path.stat().st_mtime < cutoff:
+            if not path.is_file():
+                continue
+            try:
+                rel = path.relative_to(self.images_dir).as_posix()
+                stat = path.stat()
+            except OSError:
+                continue
+            record_time = None if record_times is None else record_times.get(rel)
+            if record_times is not None and rel in record_times:
+                should_remove = (record_time if record_time is not None else stat.st_mtime) < cutoff
+            else:
+                should_remove = stat.st_mtime < cutoff
+            if should_remove:
                 path.unlink()
                 removed += 1
         for path in sorted((p for p in self.images_dir.rglob("*") if p.is_dir()), key=lambda p: len(p.parts), reverse=True):
@@ -260,11 +342,30 @@ class ConfigStore:
                 pass
         return removed
 
+    def _image_record_file_times(self) -> dict[str, float | None] | None:
+        try:
+            provider = self.get_repository_provider()
+            records = provider.image_records.list() if provider is not None else self.get_storage_backend().load_image_records()
+        except Exception:
+            return None
+        result: dict[str, float | None] = {}
+        for record in records:
+            if not isinstance(record, dict):
+                continue
+            rel = _image_relative_path(record.get("url"))
+            if not rel:
+                continue
+            timestamp = _parse_timestamp(record.get("created_at"))
+            current = result.get(rel)
+            if current is None or (timestamp is not None and timestamp > current):
+                result[rel] = timestamp
+        return result
+
     @property
     def base_url(self) -> str:
         return str(
             os.getenv("CHATGPT2API_BASE_URL")
-            or self.data.get("base_url")
+            or self._get_config_value("base_url")
             or ""
         ).strip().rstrip("/")
 
@@ -274,7 +375,7 @@ class ConfigStore:
             "gpt-image-2": "gpt-5-5",
             "codex-gpt-image-2": "codex-gpt-image-2",
         }
-        raw = self.data.get("image_model_mappings")
+        raw = self._get_config_value("image_model_mappings")
         if not isinstance(raw, dict):
             return defaults
         mappings = dict(defaults)
@@ -294,8 +395,9 @@ class ConfigStore:
         return value or "0.0.0"
 
     def get(self) -> dict[str, object]:
-        data = dict(self.data)
+        data = self._effective_data()
         data["refresh_account_interval_minute"] = self.refresh_account_interval_minute
+        data["account_lease_ttl_seconds"] = self.account_lease_ttl_seconds
         data["image_retention_days"] = self.image_retention_days
         data["auto_remove_invalid_accounts"] = self.auto_remove_invalid_accounts
         data["auto_remove_rate_limited_accounts"] = self.auto_remove_rate_limited_accounts
@@ -325,7 +427,7 @@ class ConfigStore:
         return data
 
     def get_proxy_settings(self) -> str:
-        return str(self.data.get("proxy") or "").strip()
+        return str(self._get_config_value("proxy") or "").strip()
 
     def update(self, data: dict[str, object]) -> dict[str, object]:
         updates = dict(data or {})
@@ -336,6 +438,12 @@ class ConfigStore:
                 updates.pop(secret_key, None)
         if "email_domain_whitelist" in updates:
             updates["email_domain_whitelist"] = _clean_list(updates.get("email_domain_whitelist"))
+        provider = self._provider_if_initialized()
+        if provider is not None:
+            for key, value in updates.items():
+                if key in SYSTEM_SETTING_SECRET_KEYS or key in SYSTEM_SETTING_TRANSIENT_KEYS:
+                    continue
+                provider.system_config.set_setting(key, value)
         next_data = dict(self.data)
         next_data.update(updates)
         self.data = next_data

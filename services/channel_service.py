@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import random
+import time
 import uuid
 from datetime import datetime, timezone
 from threading import RLock
@@ -10,7 +11,6 @@ from typing import Any
 from curl_cffi.requests import Session
 
 from services.config import config
-from services.protocol.conversation import format_image_result
 from services.repositories.base import RepositoryProvider
 from services.repositories.storage_adapter import RepositoryStorageAdapter
 from services.storage.base import StorageBackend
@@ -38,6 +38,7 @@ class ChannelService:
         self.storage = RepositoryStorageAdapter(storage) if isinstance(storage, RepositoryProvider) else storage
         self._lock = RLock()
         self._channels = self._load()
+        self._enabled_cache: tuple[float, list[dict[str, object]]] | None = None
 
     def _normalize(self, raw: object) -> dict[str, object] | None:
         if not isinstance(raw, dict):
@@ -88,6 +89,23 @@ class ChannelService:
     def _save(self) -> None:
         self.storage.save_channels(self._channels)
 
+    def _invalidate_cache(self) -> None:
+        self._enabled_cache = None
+
+    def _current_channels(self, *, cache_enabled: bool = False) -> list[dict[str, object]]:
+        if self.repositories is None:
+            return [dict(channel) for channel in self._channels]
+        if cache_enabled and self._enabled_cache is not None:
+            expires_at, channels = self._enabled_cache
+            if expires_at > time.monotonic():
+                return [dict(channel) for channel in channels]
+        channels = self._load()
+        if cache_enabled:
+            self._enabled_cache = (time.monotonic() + 2.0, [dict(channel) for channel in channels])
+        else:
+            self._channels = [dict(channel) for channel in channels]
+        return [dict(channel) for channel in channels]
+
     @staticmethod
     def _public(channel: dict[str, object]) -> dict[str, object]:
         return {
@@ -107,7 +125,8 @@ class ChannelService:
 
     def list_channels(self, include_internal: bool = True) -> list[dict[str, object]]:
         with self._lock:
-            items = [self._public(channel) for channel in self._channels]
+            channels = self._current_channels()
+            items = [self._public(channel) for channel in channels]
         items.sort(key=lambda item: (int(item.get("priority") or 0), int(item.get("weight") or 0)), reverse=True)
         if include_internal:
             return [
@@ -138,14 +157,20 @@ class ChannelService:
         if not _clean(channel.get("api_key")):
             raise ValueError("api_key is required")
         with self._lock:
-            self._channels.append(channel)
-            self._save()
+            if self.repositories is not None:
+                self.repositories.channels.upsert(dict(channel))
+                self._channels = self._load()
+            else:
+                self._channels.append(channel)
+                self._save()
+            self._invalidate_cache()
             return self._public(channel)
 
     def update_channel(self, channel_id: str, updates: dict[str, object]) -> dict[str, object] | None:
         normalized_id = _clean(channel_id)
         with self._lock:
-            for index, channel in enumerate(self._channels):
+            channels = self._current_channels()
+            for index, channel in enumerate(channels):
                 if channel.get("id") != normalized_id:
                     continue
                 merged = {**channel, **{key: value for key, value in updates.items() if value is not None}}
@@ -154,24 +179,40 @@ class ChannelService:
                 normalized = self._normalize(merged)
                 if normalized is None:
                     return None
-                self._channels[index] = normalized
-                self._save()
+                if self.repositories is not None:
+                    self.repositories.channels.upsert(dict(normalized))
+                    self._channels = self._load()
+                else:
+                    self._channels[index] = normalized
+                    self._save()
+                self._invalidate_cache()
                 return self._public(normalized)
         return None
 
     def delete_channel(self, channel_id: str) -> bool:
         normalized_id = _clean(channel_id)
         with self._lock:
+            if self.repositories is not None:
+                removed = self.repositories.channels.delete(normalized_id)
+                if removed:
+                    self._channels = self._load()
+                    self._invalidate_cache()
+                return removed
             before = len(self._channels)
             self._channels = [channel for channel in self._channels if channel.get("id") != normalized_id]
             if len(self._channels) == before:
                 return False
             self._save()
+            self._invalidate_cache()
             return True
 
     def _enabled_external_channels(self, model: str | None = None) -> list[dict[str, object]]:
         with self._lock:
-            channels = [dict(channel) for channel in self._channels if bool(channel.get("enabled", True))]
+            channels = [
+                dict(channel)
+                for channel in self._current_channels(cache_enabled=True)
+                if bool(channel.get("enabled", True))
+            ]
         if model:
             channels = [
                 channel
@@ -272,6 +313,8 @@ class ChannelService:
         b64_items = [item for item in data if isinstance(item, dict) and item.get("b64_json")]
         url_items = [item for item in data if isinstance(item, dict) and item.get("url") and not item.get("b64_json")]
         if b64_items:
+            from services.protocol.conversation import format_image_result
+
             result = format_image_result(
                 b64_items,
                 _clean(original_payload.get("prompt")),
@@ -284,6 +327,8 @@ class ChannelService:
         normalized = {"created": int(payload.get("created") or datetime.now().timestamp()), "data": url_items}
         if not normalized["data"]:
             # Some compatible servers return a raw base64 string in `data`.
+            from services.protocol.conversation import format_image_result
+
             for item in data:
                 if isinstance(item, str):
                     normalized["data"].append({

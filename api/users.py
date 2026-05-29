@@ -11,6 +11,7 @@ from services.auth_service import auth_service
 from services.channel_service import channel_service
 from services.config import config
 from services.image_service import list_images
+from services.log_service import audit_service
 from services import linuxdo_oauth_service
 from services.registration_security import send_registration_verification_code, validate_registration_email
 
@@ -224,6 +225,8 @@ def create_router() -> APIRouter:
             request: Request,
             start_date: str = "",
             end_date: str = "",
+            page: int = 1,
+            page_size: int = 48,
             authorization: str | None = Header(default=None),
     ):
         identity = require_identity(authorization)
@@ -234,6 +237,8 @@ def create_router() -> APIRouter:
             start_date=start_date.strip(),
             end_date=end_date.strip(),
             owner_user_id=str(identity.get("id") or ""),
+            page=page,
+            page_size=page_size,
         )
 
     @router.get("/api/admin/users")
@@ -248,7 +253,7 @@ def create_router() -> APIRouter:
 
     @router.post("/api/admin/users")
     async def admin_create_user(body: AdminUserCreateRequest, authorization: str | None = Header(default=None)):
-        require_admin(authorization)
+        admin = require_admin(authorization)
         try:
             user, password_or_token = auth_service.create_user(
                 email=body.email,
@@ -260,24 +265,46 @@ def create_router() -> APIRouter:
             )
         except ValueError as exc:
             raise HTTPException(status_code=400, detail={"error": str(exc)}) from exc
+        audit_service.add(
+            actor=admin,
+            action="users.create",
+            resource="user",
+            target_id=str(user.get("id") or ""),
+            detail={"email": user.get("email"), "quota": user.get("quota"), "status": user.get("status")},
+        )
         return {"item": user, "password": body.password, "session_token": password_or_token, "items": auth_service.list_users()}
 
     @router.post("/api/admin/users/{user_id}")
     async def admin_update_user(user_id: str, body: AdminUserUpdateRequest, authorization: str | None = Header(default=None)):
-        require_admin(authorization)
+        admin = require_admin(authorization)
+        updates = body.model_dump(exclude_unset=True, exclude_none=True)
+        before = auth_service.get_user(user_id)
         try:
-            user = auth_service.update_user(user_id, body.model_dump(exclude_none=True))
+            user = auth_service.update_user(user_id, updates)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail={"error": str(exc)}) from exc
         if user is None:
             raise HTTPException(status_code=404, detail={"error": "user not found"})
+        if updates:
+            audit_service.add(
+                actor=admin,
+                action="users.update",
+                resource="user",
+                target_id=user_id,
+                detail={
+                    "updates": updates,
+                    "previous_quota": (before or {}).get("quota"),
+                    "current_quota": user.get("quota"),
+                },
+            )
         return {"item": user, "items": auth_service.list_users()}
 
     @router.delete("/api/admin/users/{user_id}")
     async def admin_delete_user(user_id: str, authorization: str | None = Header(default=None)):
-        require_admin(authorization)
+        admin = require_admin(authorization)
         if not auth_service.delete_user(user_id):
             raise HTTPException(status_code=404, detail={"error": "user not found"})
+        audit_service.add(actor=admin, action="users.delete", resource="user", target_id=user_id)
         return {"items": auth_service.list_users()}
 
     @router.delete("/api/admin/users")
@@ -292,10 +319,23 @@ def create_router() -> APIRouter:
 
     @router.post("/api/admin/users/{user_id}/quota")
     async def admin_update_user_quota(user_id: str, body: AdminUserQuotaRequest, authorization: str | None = Header(default=None)):
-        require_admin(authorization)
+        admin = require_admin(authorization)
+        before = auth_service.get_user(user_id)
         user = auth_service.adjust_user_quota(user_id, body.amount, body.mode)
         if user is None:
             raise HTTPException(status_code=404, detail={"error": "user not found"})
+        audit_service.add(
+            actor=admin,
+            action="users.quota.adjust",
+            resource="user",
+            target_id=user_id,
+            detail={
+                "mode": body.mode,
+                "amount": body.amount,
+                "previous_quota": (before or {}).get("quota"),
+                "current_quota": user.get("quota"),
+            },
+        )
         return {"item": user, "items": auth_service.list_users()}
 
     @router.post("/api/admin/users/{user_id}/reset-password")
