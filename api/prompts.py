@@ -56,6 +56,23 @@ def create_router() -> APIRouter:
             raise HTTPException(status_code=400, detail={"error": str(exc)}) from exc
         return {"item": item, **_prompt_response()}
 
+    @router.post("/api/admin/prompts/assets")
+    async def admin_upload_prompt_asset(
+            file: UploadFile = File(...),
+            authorization: str | None = Header(default=None),
+    ):
+        require_admin(authorization)
+        data = await file.read()
+        try:
+            url = prompt_library_service.save_asset(
+                data,
+                filename=file.filename or "image.png",
+                content_type=file.content_type or "",
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail={"error": str(exc)}) from exc
+        return {"url": url}
+
     @router.post("/api/admin/prompts/{prompt_id}")
     async def admin_update_prompt(
             prompt_id: str,
@@ -77,22 +94,5 @@ def create_router() -> APIRouter:
         if not prompt_library_service.delete_prompt(prompt_id):
             raise HTTPException(status_code=404, detail={"error": "prompt not found"})
         return _prompt_response()
-
-    @router.post("/api/admin/prompts/assets")
-    async def admin_upload_prompt_asset(
-            file: UploadFile = File(...),
-            authorization: str | None = Header(default=None),
-    ):
-        require_admin(authorization)
-        data = await file.read()
-        try:
-            url = prompt_library_service.save_asset(
-                data,
-                filename=file.filename or "image.png",
-                content_type=file.content_type or "",
-            )
-        except ValueError as exc:
-            raise HTTPException(status_code=400, detail={"error": str(exc)}) from exc
-        return {"url": url}
 
     return router

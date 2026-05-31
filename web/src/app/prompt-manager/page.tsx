@@ -19,6 +19,7 @@ import {
   updateAdminPrompt,
   uploadPromptExampleImage,
 } from "@/lib/api";
+import { resolveApiAssetUrl } from "@/lib/assets";
 import { cn } from "@/lib/utils";
 import { useAuthGuard } from "@/lib/use-auth-guard";
 
@@ -241,6 +242,7 @@ function PromptManagerContent() {
     await navigator.clipboard.writeText(item.prompt);
     toast.success("提示词已复制");
   };
+  const formPreviewUrl = resolveApiAssetUrl(form.preview);
 
   return (
     <section className="space-y-5">
@@ -305,44 +307,47 @@ function PromptManagerContent() {
         </div>
       ) : (
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {filteredItems.map((item) => (
-            <article key={item.id} className="overflow-hidden rounded-lg border border-stone-200 bg-white shadow-sm">
-              <div className="aspect-[4/3] bg-stone-100">
-                {item.preview ? (
-                  <img src={item.preview} alt={`${item.title} 示例图`} className="h-full w-full object-cover" loading="lazy" />
-                ) : (
-                  <div className="flex h-full items-center justify-center text-stone-400">
-                    <ImagePlus className="size-8" />
+          {filteredItems.map((item) => {
+            const previewUrl = resolveApiAssetUrl(item.preview);
+            return (
+              <article key={item.id} className="overflow-hidden rounded-lg border border-stone-200 bg-white shadow-sm">
+                <div className="aspect-[4/3] bg-stone-100">
+                  {previewUrl ? (
+                    <img src={previewUrl} alt={`${item.title} 示例图`} className="h-full w-full object-cover" loading="lazy" />
+                  ) : (
+                    <div className="flex h-full items-center justify-center text-stone-400">
+                      <ImagePlus className="size-8" />
+                    </div>
+                  )}
+                </div>
+                <div className="flex min-h-[230px] flex-col gap-3 p-4">
+                  <div className="flex flex-wrap gap-2">
+                    <Badge variant={normalizeMode(item.mode) === "edit" ? "info" : "success"}>{modeLabel(item.mode)}</Badge>
+                    <Badge variant="outline">{categoryLabel(item)}</Badge>
                   </div>
-                )}
-              </div>
-              <div className="flex min-h-[230px] flex-col gap-3 p-4">
-                <div className="flex flex-wrap gap-2">
-                  <Badge variant={normalizeMode(item.mode) === "edit" ? "info" : "success"}>{modeLabel(item.mode)}</Badge>
-                  <Badge variant="outline">{categoryLabel(item)}</Badge>
-                </div>
-                <div className="min-w-0">
-                  <h2 className="line-clamp-2 text-sm font-semibold leading-5 text-stone-950">{item.title}</h2>
-                  {item.description ? <p className="mt-1 truncate text-xs text-stone-400">{item.description}</p> : null}
-                  <p className="mt-2 line-clamp-4 text-xs leading-5 text-stone-500">{summarizePrompt(item.prompt)}</p>
-                </div>
-                <div className="mt-auto flex items-center justify-between gap-2">
-                  <div className="min-w-0 truncate text-xs text-stone-400">{item.author || "未署名"}</div>
-                  <div className="flex shrink-0 items-center gap-1">
-                    <Button variant="ghost" size="icon" className="size-8 rounded-lg text-stone-500 hover:bg-stone-100" onClick={() => void copyPrompt(item)}>
-                      <Copy className="size-4" />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="size-8 rounded-lg text-stone-500 hover:bg-stone-100" onClick={() => openEditDialog(item)}>
-                      <Pencil className="size-4" />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="size-8 rounded-lg text-rose-500 hover:bg-rose-50" onClick={() => void handleDelete(item)}>
-                      <Trash2 className="size-4" />
-                    </Button>
+                  <div className="min-w-0">
+                    <h2 className="line-clamp-2 text-sm font-semibold leading-5 text-stone-950">{item.title}</h2>
+                    {item.description ? <p className="mt-1 truncate text-xs text-stone-400">{item.description}</p> : null}
+                    <p className="mt-2 line-clamp-4 text-xs leading-5 text-stone-500">{summarizePrompt(item.prompt)}</p>
+                  </div>
+                  <div className="mt-auto flex items-center justify-between gap-2">
+                    <div className="min-w-0 truncate text-xs text-stone-400">{item.author || "未署名"}</div>
+                    <div className="flex shrink-0 items-center gap-1">
+                      <Button variant="ghost" size="icon" className="size-8 rounded-lg text-stone-500 hover:bg-stone-100" onClick={() => void copyPrompt(item)}>
+                        <Copy className="size-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="size-8 rounded-lg text-stone-500 hover:bg-stone-100" onClick={() => openEditDialog(item)}>
+                        <Pencil className="size-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="size-8 rounded-lg text-rose-500 hover:bg-rose-50" onClick={() => void handleDelete(item)}>
+                        <Trash2 className="size-4" />
+                      </Button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </article>
-          ))}
+              </article>
+            );
+          })}
         </div>
       )}
 
@@ -423,8 +428,8 @@ function PromptManagerContent() {
                 <div className="space-y-2">
                   <span className="text-xs font-medium text-stone-500">示例图</span>
                   <div className="aspect-[4/3] overflow-hidden rounded-lg border border-stone-200 bg-stone-100">
-                    {form.preview ? (
-                      <img src={form.preview} alt="示例图预览" className="h-full w-full object-cover" />
+                    {formPreviewUrl ? (
+                      <img src={formPreviewUrl} alt="示例图预览" className="h-full w-full object-cover" />
                     ) : (
                       <div className="flex h-full items-center justify-center text-stone-400">
                         <ImagePlus className="size-8" />

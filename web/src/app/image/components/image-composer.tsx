@@ -31,6 +31,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { fetchPromptLibrary, type PromptLibraryItem } from "@/lib/api";
+import { resolveApiAssetUrl } from "@/lib/assets";
 import type { ImageConversationMode } from "@/store/image-conversations";
 import { cn } from "@/lib/utils";
 
@@ -590,21 +591,21 @@ function getBananaPromptPreviewUrl(item: PromptPickerItem) {
     return "";
   }
   if (candidate.startsWith("/")) {
-    return candidate;
+    return resolveApiAssetUrl(candidate);
   }
 
   try {
     const url = new URL(candidate);
     const jsDelivrPrefix = "/gh/glidea/banana-prompt-quicker@main/";
     if (url.hostname === "cdn.jsdelivr.net" && url.pathname.startsWith(jsDelivrPrefix)) {
-      return `${BANANA_PROMPTS_ASSET_BASE_URL}${url.pathname.slice(jsDelivrPrefix.length)}`;
+      return resolveApiAssetUrl(`${BANANA_PROMPTS_ASSET_BASE_URL}${url.pathname.slice(jsDelivrPrefix.length)}`);
     }
     if (url.hostname === "raw.githubusercontent.com" && url.pathname.startsWith("/glidea/banana-prompt-quicker/main/")) {
-      return `${BANANA_PROMPTS_ASSET_BASE_URL}${url.pathname.slice("/glidea/banana-prompt-quicker/main/".length)}`;
+      return resolveApiAssetUrl(`${BANANA_PROMPTS_ASSET_BASE_URL}${url.pathname.slice("/glidea/banana-prompt-quicker/main/".length)}`);
     }
-    return candidate;
+    return resolveApiAssetUrl(candidate);
   } catch {
-    return `${BANANA_PROMPTS_ASSET_BASE_URL}${candidate.replace(/^\.?\//, "")}`;
+    return resolveApiAssetUrl(`${BANANA_PROMPTS_ASSET_BASE_URL}${candidate.replace(/^\.?\//, "")}`);
   }
 }
 
