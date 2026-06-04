@@ -46,6 +46,7 @@ from services.repositories.base import (
     SystemLogRepository,
     UserRepository,
 )
+from utils.timezone import china_now_text
 
 
 Base = declarative_base()
@@ -1467,7 +1468,7 @@ class SQLAlchemySystemLogRepository(SystemLogRepository):
         log_id = _clean(normalized.get("id") or normalized.get("log_id")) or uuid.uuid4().hex
         normalized["id"] = log_id
         normalized["log_id"] = log_id
-        normalized["time"] = _clean(normalized.get("time")) or datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        normalized["time"] = _clean(normalized.get("time")) or china_now_text()
         normalized["type"] = _clean(normalized.get("type")) or "log"
         normalized["summary"] = _clean(normalized.get("summary"))
         detail = normalized.get("detail")
@@ -1606,7 +1607,7 @@ class SQLAlchemyAuditLogRepository(AuditLogRepository):
         audit_id = _clean(normalized.get("id") or normalized.get("audit_id")) or uuid.uuid4().hex
         normalized["id"] = audit_id
         normalized["audit_id"] = audit_id
-        normalized["time"] = _clean(normalized.get("time")) or datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        normalized["time"] = _clean(normalized.get("time")) or china_now_text()
         normalized["actor_id"] = _clean(normalized.get("actor_id"))
         normalized["actor_name"] = _clean(normalized.get("actor_name"))
         normalized["actor_role"] = _clean(normalized.get("actor_role"))

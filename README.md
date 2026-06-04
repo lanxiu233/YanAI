@@ -404,6 +404,14 @@ curl http://localhost:8000/v1/responses \
 </details>
 </details>
 
+## ToDoList
+
+- [x] 择默认提示词模板后，没法再次点击取消，添加一键清空模板按钮
+- [ ] 每个用户也能单独管理自己的提示词
+- [ ] 提示词分享和用户导入
+- [x] 兑换码批量导出
+- [ ] 接入支付功能
+
 ## 社区支持
 
 学 AI , 上 L 站：[LinuxDO](https://linux.do)

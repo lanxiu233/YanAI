@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AlertTriangle, Copy, Gift, LoaderCircle, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { AlertTriangle, Copy, Download, Gift, LoaderCircle, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -19,6 +19,17 @@ import {
 import { Input } from "@/components/ui/input";
 import { createRedeemCodes, deleteRedeemCodes, fetchRedeemCodes, updateRedeemCode, type RedeemCode } from "@/lib/api";
 import { useAuthGuard } from "@/lib/use-auth-guard";
+
+function downloadRedeemCodes(codes: RedeemCode[]) {
+  const content = `${codes.map((item) => item.code).join("\n")}\n`;
+  const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `redeem-codes-${Date.now()}.txt`;
+  link.click();
+  URL.revokeObjectURL(url);
+}
 
 function RedeemCodesContent() {
   const [items, setItems] = useState<RedeemCode[]>([]);
@@ -96,6 +107,15 @@ function RedeemCodesContent() {
     setDeleteTarget(codes);
   };
 
+  const handleExportCodes = () => {
+    if (selectedCodes.length === 0) {
+      toast.error("请先选择要导出的兑换码");
+      return;
+    }
+    downloadRedeemCodes(selectedCodes);
+    toast.success(`已导出 ${selectedCodes.length} 个兑换码`);
+  };
+
   const handleDeleteCodes = async () => {
     if (!deleteTarget || deleteTarget.length === 0) return;
     setIsDeleting(true);
@@ -155,6 +175,15 @@ function RedeemCodesContent() {
               />
               选择全部
             </label>
+            <Button
+              variant="ghost"
+              className="h-8 rounded-lg px-3 text-rose-500 hover:bg-rose-50 hover:text-rose-600"
+              onClick={handleExportCodes}
+              disabled={selectedCodes.length === 0}
+            >
+              <Download className="size-4" />
+              导出所选
+            </Button>
             <Button
               variant="ghost"
               className="h-8 rounded-lg px-3 text-rose-500 hover:bg-rose-50 hover:text-rose-600"

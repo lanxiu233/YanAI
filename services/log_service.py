@@ -5,7 +5,6 @@ import itertools
 import time
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -16,6 +15,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from services.config import DATA_DIR
 from services.observability import get_current_request_id
 from utils.helper import anthropic_sse_stream, sse_json_stream
+from utils.timezone import china_now_text, china_timestamp_text
 
 LOG_TYPE_CALL = "call"
 LOG_TYPE_ACCOUNT = "account"
@@ -50,7 +50,7 @@ class LogService:
             log_detail["request_id"] = normalized_request_id
         item = {
             "id": uuid.uuid4().hex,
-            "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "time": china_now_text(),
             "type": type,
             "summary": summary,
             "detail": log_detail,
@@ -190,7 +190,7 @@ class AuditService:
             normalized_detail["request_id"] = normalized_request_id
         item = {
             "id": uuid.uuid4().hex,
-            "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "time": china_now_text(),
             "type": LOG_TYPE_AUDIT,
             "summary": action,
             "actor_id": str((actor or {}).get("id") or ""),
@@ -371,8 +371,8 @@ class LoggedCall:
             "role": self.identity.get("role"),
             "endpoint": self.endpoint,
             "model": self.model,
-            "started_at": datetime.fromtimestamp(self.started).strftime("%Y-%m-%d %H:%M:%S"),
-            "ended_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "started_at": china_timestamp_text(self.started),
+            "ended_at": china_now_text(),
             "duration_ms": int((time.time() - self.started) * 1000),
             "status": status,
         }

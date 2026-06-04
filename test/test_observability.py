@@ -9,6 +9,7 @@ from unittest import mock
 from services.log_service import LOG_TYPE_CALL, LogService
 from services.observability import get_current_request_id, request_id_context
 from services.storage.database_storage import DatabaseStorageBackend
+from utils.timezone import china_timestamp_text
 
 
 class ObservabilityTest(unittest.TestCase):
@@ -17,6 +18,9 @@ class ObservabilityTest(unittest.TestCase):
         with request_id_context("req-observe-1"):
             self.assertEqual(get_current_request_id(), "req-observe-1")
         self.assertEqual(get_current_request_id(), "")
+
+    def test_server_log_time_uses_china_timezone(self) -> None:
+        self.assertEqual(china_timestamp_text(0), "1970-01-01 08:00:00")
 
     def test_system_logs_are_persisted_and_paginated_in_database(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
