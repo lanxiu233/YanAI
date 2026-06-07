@@ -91,7 +91,7 @@ export default function SignupPage() {
               <Sparkles className="size-5" />
             </div>
             <div className="space-y-2">
-              <h1 className="text-3xl font-semibold tracking-tight text-stone-950">创建颜AI账号</h1>
+              <h1 className="text-3xl font-semibold tracking-tight text-stone-950">创建颜值AI账号</h1>
               <p className="text-sm leading-6 text-stone-500">注册后可通过兑换码获得画图额度。</p>
             </div>
           </div>

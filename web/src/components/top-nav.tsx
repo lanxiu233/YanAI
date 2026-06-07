@@ -95,7 +95,7 @@ export function TopNav() {
             颜
           </span>
           <span className="hidden leading-tight sm:block">
-            <span className="block text-[17px] font-bold tracking-tight text-stone-950">颜AI</span>
+            <span className="block text-[17px] font-bold tracking-tight text-stone-950">颜值AI</span>
             <span className="block text-xs font-medium text-stone-500">Image Studio</span>
           </span>
         </Link>

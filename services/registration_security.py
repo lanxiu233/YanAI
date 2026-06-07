@@ -10,6 +10,7 @@ import ssl
 import time
 from dataclasses import dataclass
 from email.message import EmailMessage
+from email.utils import formataddr
 from threading import RLock
 
 from services.config import config
@@ -99,14 +100,15 @@ def _send_email(receiver: str, subject: str, html: str) -> None:
     username = config.smtp_username
     password = config.smtp_password
     sender = config.smtp_from_email
+    sender_name = config.smtp_from_name
     if not host or not sender:
         raise ValueError("SMTP is not configured")
 
     message = EmailMessage()
     message["Subject"] = subject
-    message["From"] = sender
+    message["From"] = formataddr((sender_name, sender)) if sender_name else sender
     message["To"] = receiver
-    message.set_content("Your verification code is included in the HTML email.")
+    message.set_content("你正在注册颜值AI账号。验证码已包含在 HTML 邮件中，10 分钟内有效。")
     message.add_alternative(html, subtype="html")
 
     context = ssl.create_default_context()
@@ -143,15 +145,21 @@ def send_registration_verification_code(email: str) -> None:
             raise ValueError(f"please wait {wait_seconds}s before requesting another code")
 
     code = f"{secrets.randbelow(1_000_000):06d}"
+    brand_name = config.smtp_from_name or "颜值AI"
     html = f"""
-    <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;line-height:1.7;color:#1c1917">
-      <h2 style="margin:0 0 12px">颜AI 邮箱验证码</h2>
-      <p>你正在注册颜AI账号，本次验证码为：</p>
-      <p style="font-size:28px;font-weight:700;letter-spacing:6px;margin:18px 0">{code}</p>
-      <p>验证码 10 分钟内有效。如果不是你本人操作，可以忽略这封邮件。</p>
+    <div style="margin:0;background:#f8fafc;padding:28px 0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;color:#1c1917">
+      <div style="max-width:520px;margin:0 auto;border:1px solid #e7e5e4;border-radius:18px;background:#ffffff;padding:28px;box-shadow:0 18px 48px rgba(15,23,42,0.08)">
+        <div style="font-size:13px;font-weight:700;letter-spacing:.08em;color:#e11d48;text-transform:uppercase">{brand_name}</div>
+        <h2 style="margin:12px 0 8px;font-size:22px;line-height:1.35;color:#0c0a09">邮箱验证码</h2>
+        <p style="margin:0;color:#57534e;font-size:14px;line-height:1.8">你正在注册 {brand_name} 账号，请在页面中输入以下验证码完成邮箱验证。</p>
+        <div style="margin:24px 0;border-radius:16px;background:#fff1f2;padding:22px;text-align:center">
+          <div style="font-size:32px;font-weight:800;letter-spacing:8px;color:#be123c">{code}</div>
+        </div>
+        <p style="margin:0;color:#78716c;font-size:13px;line-height:1.8">验证码 10 分钟内有效。若不是你本人操作，可以忽略这封邮件。</p>
+      </div>
     </div>
     """.strip()
-    _send_email(normalized, "颜AI 邮箱验证码", html)
+    _send_email(normalized, f"{brand_name} 邮箱验证码", html)
 
     with _lock:
         _codes[normalized] = VerificationRecord(

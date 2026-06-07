@@ -277,6 +277,10 @@ class ConfigStore:
         return str(os.getenv("CHATGPT2API_SMTP_FROM") or self._get_config_value("smtp_from_email") or self.smtp_username).strip()
 
     @property
+    def smtp_from_name(self) -> str:
+        return str(os.getenv("CHATGPT2API_SMTP_FROM_NAME") or self._get_config_value("smtp_from_name") or "颜值AI").strip()
+
+    @property
     def smtp_use_ssl(self) -> bool:
         return _bool(self._get_config_value("smtp_use_ssl"), self.smtp_port == 465)
 
@@ -417,6 +421,7 @@ class ConfigStore:
         data["smtp_port"] = self.smtp_port
         data["smtp_username"] = self.smtp_username
         data["smtp_from_email"] = self.smtp_from_email
+        data["smtp_from_name"] = self.smtp_from_name
         data["smtp_use_ssl"] = self.smtp_use_ssl
         data["smtp_use_starttls"] = self.smtp_use_starttls
         data["smtp_force_auth_login"] = self.smtp_force_auth_login

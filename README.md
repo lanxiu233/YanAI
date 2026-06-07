@@ -1,6 +1,6 @@
-<h1 align="center">颜AI</h1>
+<h1 align="center">颜值AI</h1>
 
-<p align="center">颜AI 是一个围绕 ChatGPT 图片能力封装的自托管图片创作与管理系统，提供 OpenAI 兼容图片 API、在线画图工作台、图生图预设、账号池轮询、个人用户额度、渠道管理、模型管理、计费标准配置、图片归档、日志与 Docker 部署能力。</p>
+<p align="center">颜值AI 是一个围绕 ChatGPT 图片能力封装的自托管图片创作与管理系统，提供 OpenAI 兼容图片 API、在线画图工作台、图生图预设、账号池轮询、个人用户额度、渠道管理、模型管理、计费标准配置、图片归档、日志与 Docker 部署能力。</p>
 
 > [!WARNING]
 > 免责声明：
@@ -57,10 +57,10 @@ docker compose -f docker-compose.local.yml up -d --build
 
 本地开发启动
 ```bash
-cd D:\Desktop\颜AI
+cd D:\Desktop\颜值AI
 .\.venv\Scripts\python.exe -m uvicorn main:app --reload --host 127.0.0.1 --port 8000
 
-cd D:\Desktop\颜AI\web
+cd D:\Desktop\颜值AI\web
 npm run dev
 ```
 
@@ -451,7 +451,7 @@ curl http://localhost:8000/v1/responses \
 
 ## 致谢
 
-感谢佬友的 [basketikun/chatgpt2api](https://github.com/basketikun/chatgpt2api) 项目在 ChatGPT 逆向整理、OpenAI 兼容接口封装和自托管部署思路上的探索与开源分享。颜AI 的项目方向与部分实现思路受其启发。<br>
+感谢佬友的 [basketikun/chatgpt2api](https://github.com/basketikun/chatgpt2api) 项目在 ChatGPT 逆向整理、OpenAI 兼容接口封装和自托管部署思路上的探索与开源分享。颜值AI 的项目方向与部分实现思路受其启发。<br>
 感谢佬友的[贴一个让设计师也觉得脊背发凉的提示词 ](https://linux.do/t/topic/532495)<br>
 感谢佬友的 [🍌Banana Prompt Quicker](https://linux.do/t/topic/1244563)项目在提示词快捷工作流上的开源分享与启发。<br>
 

@@ -293,6 +293,16 @@ export function ConfigCard() {
                 <Input value={String(config?.smtp_from_email || "")} onChange={(event) => patchConfig({ smtp_from_email: event.target.value })} className="h-10 rounded-xl border-stone-200 bg-stone-50" />
               </div>
               <div className="space-y-2 md:col-span-2">
+                <label className="text-sm text-stone-700">SMTP 发件人名称</label>
+                <Input
+                  value={String(config?.smtp_from_name || "颜值AI")}
+                  onChange={(event) => patchConfig({ smtp_from_name: event.target.value })}
+                  placeholder="颜值AI"
+                  className="h-10 rounded-xl border-stone-200 bg-stone-50"
+                />
+                <p className="text-xs text-stone-500">收件箱中会显示为“颜值AI &lt;你的邮箱&gt;”，比直接显示个人邮箱更正式。</p>
+              </div>
+              <div className="space-y-2 md:col-span-3">
                 <label className="text-sm text-stone-700">SMTP 访问凭证</label>
                 <Input
                   type="password"

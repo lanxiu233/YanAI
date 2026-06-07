@@ -89,6 +89,7 @@ export type SettingsConfig = {
   smtp_password?: string;
   smtp_password_set?: boolean;
   smtp_from_email?: string;
+  smtp_from_name?: string;
   smtp_use_ssl?: boolean;
   smtp_use_starttls?: boolean;
   smtp_force_auth_login?: boolean;

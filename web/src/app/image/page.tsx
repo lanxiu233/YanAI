@@ -1153,7 +1153,7 @@ function ImagePageContent({ session }: { session: StoredAuthSession }) {
             <div className="min-w-0 flex-1">
               <h1 className="truncate text-2xl font-bold tracking-tight text-stone-950">月光影像创作台</h1>
               <p className="mt-1 truncate text-sm text-stone-500">
-                gpt-image-2 · 创作队列 {workspaceStats.active} · 当前空间 颜AI Studio
+                gpt-image-2 · 创作队列 {workspaceStats.active} · 当前空间 颜值AI Studio
               </p>
             </div>
             <label className="relative w-full md:max-w-[360px]">

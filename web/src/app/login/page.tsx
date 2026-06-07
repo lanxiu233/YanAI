@@ -83,7 +83,7 @@ export default function LoginPage() {
               <Sparkles className="size-5" />
             </div>
             <div className="space-y-2">
-              <h1 className="text-3xl font-semibold tracking-tight text-stone-950">颜AI</h1>
+              <h1 className="text-3xl font-semibold tracking-tight text-stone-950">颜值AI</h1>
               <p className="text-sm leading-6 text-stone-500">登录后开始创作和管理你的 AI 美图。</p>
             </div>
           </div>
