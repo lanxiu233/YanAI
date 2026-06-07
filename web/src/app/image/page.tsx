@@ -14,6 +14,7 @@ import {
   Menu,
   Plus,
   Search,
+  Sparkles,
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -1004,6 +1005,41 @@ function ImagePageContent({ session }: { session: StoredAuthSession }) {
   );
   /* eslint-enable react-hooks/preserve-manual-memoization */
 
+  const handleRetryTurn = useCallback(
+    async (conversationId: string, turnId: string) => {
+      await updateConversation(conversationId, (current) => {
+        if (!current) {
+          throw new Error("未找到可重试的对话");
+        }
+        return {
+          ...current,
+          updatedAt: new Date().toISOString(),
+          turns: current.turns.map((turn) =>
+            turn.id === turnId
+              ? {
+                  ...turn,
+                  status: "queued",
+                  error: undefined,
+                  images: turn.images.map((image) =>
+                    image.status === "error"
+                      ? {
+                          id: image.id,
+                          status: "loading" as const,
+                        }
+                      : image,
+                  ),
+                }
+              : turn,
+          ),
+        };
+      });
+      setSelectedConversationId(conversationId);
+      toast.success("已重新加入生成队列");
+      void runConversationQueue(conversationId);
+    },
+    [runConversationQueue, updateConversation],
+  );
+
   useEffect(() => {
     for (const conversation of conversations) {
       if (
@@ -1149,22 +1185,41 @@ function ImagePageContent({ session }: { session: StoredAuthSession }) {
             </Button>
           </div>
 
-          <header className="yan-panel flex min-h-16 flex-col gap-3 rounded-lg px-4 py-3 md:flex-row md:items-center">
-            <div className="min-w-0 flex-1">
-              <h1 className="truncate text-2xl font-bold tracking-tight text-stone-950">月光影像创作台</h1>
-              <p className="mt-1 truncate text-sm text-stone-500">
-                gpt-image-2 · 创作队列 {workspaceStats.active} · 当前空间 颜值AI Studio
-              </p>
+          <header className="yan-panel relative overflow-hidden rounded-lg px-4 py-4">
+            <div className="absolute -right-12 -top-16 h-36 w-36 rounded-full bg-rose-300/25 blur-3xl" />
+            <div className="relative flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <div className="min-w-0 flex-1">
+                <div className="inline-flex items-center gap-2 rounded-full bg-white/70 px-3 py-1 text-xs font-semibold text-rose-600">
+                  <Sparkles className="size-3.5" />
+                  颜值AI Studio
+                </div>
+                <h1 className="mt-3 truncate text-2xl font-black tracking-tight text-stone-950">月光影像创作台</h1>
+                <p className="mt-1 truncate text-sm text-stone-500">
+                  选模板或输入提示词 · 上传参考图 · 生成后继续编辑
+                </p>
+              </div>
+              <div className="grid min-w-[260px] grid-cols-3 gap-2 text-center text-xs">
+                {[
+                  ["1", "选模板"],
+                  ["2", imageMode === "edit" ? "放参考图" : "写描述"],
+                  ["3", "出结果"],
+                ].map(([step, label]) => (
+                  <div key={step} className="rounded-xl border border-white/70 bg-white/62 px-3 py-2">
+                    <div className="mx-auto grid size-6 place-items-center rounded-full bg-[#2d1d26] text-[11px] font-bold text-white">{step}</div>
+                    <div className="mt-1 font-semibold text-stone-700">{label}</div>
+                  </div>
+                ))}
+              </div>
+              <label className="relative w-full md:max-w-[320px]">
+                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-stone-400" />
+                <input
+                  value={workspaceSearch}
+                  onChange={(event) => setWorkspaceSearch(event.target.value)}
+                  placeholder="搜索作品、提示词、会话"
+                  className="h-10 w-full rounded-lg border border-[var(--yan-border)] bg-white/72 pl-9 pr-3 text-sm text-stone-700 outline-none transition placeholder:text-stone-400 focus:border-rose-200 focus:bg-white focus:ring-4 focus:ring-rose-100/60"
+                />
+              </label>
             </div>
-            <label className="relative w-full md:max-w-[360px]">
-              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-stone-400" />
-              <input
-                value={workspaceSearch}
-                onChange={(event) => setWorkspaceSearch(event.target.value)}
-                placeholder="搜索作品、提示词、会话"
-                className="h-10 w-full rounded-lg border border-[var(--yan-border)] bg-white/72 pl-9 pr-3 text-sm text-stone-700 outline-none transition placeholder:text-stone-400 focus:border-rose-200 focus:bg-white focus:ring-4 focus:ring-rose-100/60"
-              />
-            </label>
           </header>
 
           <div className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-4">
@@ -1193,6 +1248,7 @@ function ImagePageContent({ session }: { session: StoredAuthSession }) {
                   selectedConversation={selectedConversation}
                   onOpenLightbox={openLightbox}
                   onContinueEdit={handleContinueEdit}
+                  onRetryTurn={handleRetryTurn}
                   formatConversationTime={formatConversationTime}
                 />
               </div>

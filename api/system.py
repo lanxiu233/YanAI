@@ -147,6 +147,11 @@ def create_router(app_version: str) -> APIRouter:
         require_admin(authorization)
         return {"config": config.update(body.model_dump(mode="python"))}
 
+    @router.get("/api/announcement")
+    async def get_announcement(authorization: str | None = Header(default=None)):
+        require_identity(authorization)
+        return {"announcement": config.announcement}
+
     @router.get("/api/images")
     async def get_images(
             request: Request,

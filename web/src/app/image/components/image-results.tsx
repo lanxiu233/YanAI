@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Clock3, Copy, ImageIcon, LoaderCircle, Share2, Sparkles } from "lucide-react";
+import { Clock3, Copy, ImageIcon, LoaderCircle, RotateCcw, Share2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,7 @@ type ImageResultsProps = {
   selectedConversation: ImageConversation | null;
   onOpenLightbox: (images: ImageLightboxItem[], index: number) => void;
   onContinueEdit: (conversationId: string, image: StoredImage | StoredReferenceImage) => void;
+  onRetryTurn: (conversationId: string, turnId: string) => void | Promise<void>;
   formatConversationTime: (value: string) => string;
 };
 
@@ -101,6 +102,7 @@ export function ImageResults({
   selectedConversation,
   onOpenLightbox,
   onContinueEdit,
+  onRetryTurn,
   formatConversationTime,
 }: ImageResultsProps) {
   const [imageDimensions, setImageDimensions] = useState<Record<string, string>>({});
@@ -272,6 +274,18 @@ export function ImageResults({
                     <Share2 className="size-4" />
                     分享
                   </Button>
+                  {turn.status === "error" ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 rounded-lg border-amber-200 bg-amber-50 px-2.5 text-amber-800 hover:bg-amber-100"
+                      onClick={() => void onRetryTurn(selectedConversation.id, turn.id)}
+                    >
+                      <RotateCcw className="size-4" />
+                      重试
+                    </Button>
+                  ) : null}
                   <div className="rounded-full bg-rose-50 px-3 py-1 text-xs font-semibold text-stone-600">
                     {turn.count} 张
                   </div>
@@ -327,19 +341,19 @@ export function ImageResults({
                     <div
                       key={image.id}
                       className={cn(
-                        "overflow-hidden rounded-lg border border-white/75 bg-white/78 shadow-sm",
+                        "group overflow-hidden rounded-lg border border-white/75 bg-white/78 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_22px_54px_rgba(84,38,62,0.16)]",
                         featured && "md:row-span-2",
                       )}
                     >
                       <button
                         type="button"
                         onClick={() => onOpenLightbox(successfulTurnImages, Math.max(0, currentIndex))}
-                        className={cn("group block w-full cursor-zoom-in bg-stone-100", featured ? "aspect-[3/4]" : getImageAspectClass(turn.size))}
+                        className={cn("relative block w-full cursor-zoom-in overflow-hidden bg-stone-100", featured ? "aspect-[3/4]" : getImageAspectClass(turn.size))}
                       >
                         <img
                           src={imageSrc}
                           alt={`Generated result ${index + 1}`}
-                          className="h-full w-full object-cover transition duration-200 group-hover:brightness-90"
+                          className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.025] group-hover:brightness-90"
                           onLoad={(event) => {
                             updateImageDimensions(
                               image.id,
@@ -348,6 +362,9 @@ export function ImageResults({
                             );
                           }}
                         />
+                        <div className="pointer-events-none absolute inset-x-0 bottom-0 translate-y-2 bg-gradient-to-t from-black/55 to-transparent px-3 pt-10 pb-3 opacity-0 transition duration-200 group-hover:translate-y-0 group-hover:opacity-100">
+                          <div className="text-left text-xs font-medium text-white/90">点击放大预览</div>
+                        </div>
                       </button>
                       <div className="flex items-center justify-between gap-2 px-3 py-3">
                         <div className="min-w-0 text-xs text-stone-500">
@@ -361,7 +378,7 @@ export function ImageResults({
                           onClick={() => onContinueEdit(selectedConversation.id, image)}
                         >
                           <Sparkles className="size-4" />
-                          编辑
+                          继续编辑
                         </Button>
                       </div>
                     </div>

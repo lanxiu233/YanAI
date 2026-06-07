@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
   BadgeDollarSign,
+  Bell,
   Boxes,
   FileText,
   Gift,
@@ -21,7 +22,18 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
+import { Badge } from "@/components/ui/badge";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import webConfig from "@/constants/common-env";
+import {
+  ANNOUNCEMENT_UPDATED_EVENT,
+  fetchAnnouncement,
+  type AnnouncementConfig,
+} from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { clearStoredAuthSession, getStoredAuthSession, type StoredAuthSession } from "@/store/auth";
 
@@ -52,10 +64,34 @@ const userNavItems = [
   { href: "/profile", label: "个人中心", icon: User },
 ] satisfies NavItem[];
 
+const ANNOUNCEMENT_REFRESH_INTERVAL_MS = 30000;
+
+const announcementLabels: Record<AnnouncementConfig["level"], string> = {
+  info: "通知",
+  success: "完成",
+  warning: "提醒",
+  danger: "重要",
+};
+
+function formatAnnouncementTime(value?: string | null) {
+  const timestamp = Date.parse(String(value || ""));
+  if (!Number.isFinite(timestamp)) {
+    return "";
+  }
+  return new Intl.DateTimeFormat("zh-CN", {
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(timestamp));
+}
+
 export function TopNav() {
   const pathname = usePathname();
   const router = useRouter();
   const [session, setSession] = useState<StoredAuthSession | null | undefined>(undefined);
+  const [announcement, setAnnouncement] = useState<AnnouncementConfig | null>(null);
+  const [announcementOpen, setAnnouncementOpen] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -75,6 +111,71 @@ export function TopNav() {
     };
   }, [pathname]);
 
+  const refreshAnnouncement = async () => {
+    try {
+      const data = await fetchAnnouncement();
+      setAnnouncement(data.announcement);
+    } catch {
+      setAnnouncement(null);
+    }
+  };
+
+  useEffect(() => {
+    let active = true;
+
+    if (!session) {
+      setAnnouncement(null);
+      return () => {
+        active = false;
+      };
+    }
+
+    const refresh = async () => {
+      try {
+        const data = await fetchAnnouncement();
+        if (active) setAnnouncement(data.announcement);
+      } catch {
+        if (active) setAnnouncement(null);
+      }
+    };
+
+    const handleAnnouncementUpdated = () => {
+      void refresh();
+    };
+
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key === ANNOUNCEMENT_UPDATED_EVENT) {
+        void refresh();
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void refresh();
+      }
+    };
+
+    void refresh();
+    window.addEventListener(ANNOUNCEMENT_UPDATED_EVENT, handleAnnouncementUpdated);
+    window.addEventListener("storage", handleStorage);
+    window.addEventListener("focus", handleAnnouncementUpdated);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    const intervalId = window.setInterval(() => {
+      if (document.visibilityState !== "hidden") {
+        void refresh();
+      }
+    }, ANNOUNCEMENT_REFRESH_INTERVAL_MS);
+
+    return () => {
+      active = false;
+      window.removeEventListener(ANNOUNCEMENT_UPDATED_EVENT, handleAnnouncementUpdated);
+      window.removeEventListener("storage", handleStorage);
+      window.removeEventListener("focus", handleAnnouncementUpdated);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.clearInterval(intervalId);
+    };
+  }, [pathname, session?.key]);
+
   const handleLogout = async () => {
     await clearStoredAuthSession();
     router.replace("/login");
@@ -86,6 +187,8 @@ export function TopNav() {
 
   const navItems = session.role === "admin" ? adminNavItems : userNavItems;
   const roleLabel = session.role === "admin" ? "管理员" : "个人用户";
+  const hasAnnouncement = Boolean(announcement?.enabled && (announcement.title || announcement.content));
+  const announcementTime = formatAnnouncementTime(announcement?.updated_at);
 
   return (
     <header className="border-b border-rose-100/80 bg-white/48 backdrop-blur-xl">
@@ -126,6 +229,50 @@ export function TopNav() {
           <span className="hidden rounded-lg border border-rose-100 bg-white/65 px-2.5 py-1 text-[11px] font-medium text-rose-600 sm:inline-block">
             {roleLabel}
           </span>
+          <Popover
+            open={announcementOpen}
+            onOpenChange={(open) => {
+              setAnnouncementOpen(open);
+              if (open) void refreshAnnouncement();
+            }}
+          >
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                className={cn(
+                  "relative inline-flex size-9 items-center justify-center rounded-lg transition hover:bg-white/65",
+                  hasAnnouncement ? "text-rose-600" : "text-stone-400 hover:text-rose-600",
+                )}
+                aria-label="查看通知"
+              >
+                <Bell className="size-4" />
+                {hasAnnouncement ? <span className="absolute right-2 top-2 size-2 rounded-full bg-rose-500 shadow-[0_0_0_3px_rgba(255,255,255,0.9)]" /> : null}
+              </button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-[min(22rem,calc(100vw-2rem))] space-y-3 rounded-2xl border-rose-100 bg-white/96 p-4">
+              {hasAnnouncement && announcement ? (
+                <>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 space-y-1">
+                      <Badge variant={announcement.level}>{announcementLabels[announcement.level]}</Badge>
+                      <h2 className="break-words text-sm font-semibold leading-6 text-stone-950">
+                        {announcement.title || "站内公告"}
+                      </h2>
+                    </div>
+                    {announcementTime ? <span className="shrink-0 text-[11px] text-stone-400">{announcementTime}</span> : null}
+                  </div>
+                  {announcement.content ? (
+                    <p className="whitespace-pre-wrap break-words text-sm leading-6 text-stone-600">{announcement.content}</p>
+                  ) : null}
+                </>
+              ) : (
+                <div className="space-y-1 text-sm leading-6">
+                  <h2 className="font-semibold text-stone-900">暂无公告</h2>
+                  <p className="text-stone-500">管理员发布公告后会显示在这里。</p>
+                </div>
+              )}
+            </PopoverContent>
+          </Popover>
           <span className="hidden rounded-lg border border-rose-100 bg-white/65 px-2.5 py-1 text-[11px] font-medium text-stone-400 sm:inline-block">
             v{webConfig.appVersion}
           </span>

@@ -8,9 +8,16 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import webConfig from "@/constants/common-env";
-import { testProxy, type ProxyTestResult } from "@/lib/api";
+import { testProxy, type AnnouncementConfig, type AnnouncementLevel, type ProxyTestResult } from "@/lib/api";
 
 import { useSettingsStore } from "../store";
 
@@ -35,6 +42,13 @@ export function ConfigCard() {
   const apiBase = webConfig.apiUrl.replace(/\/$/, "") || (typeof window !== "undefined" ? window.location.origin : "");
   const linuxDoCallbackUrl = `${apiBase}/oauth/linuxdo`;
   const whitelistText = Array.isArray(config?.email_domain_whitelist) ? config.email_domain_whitelist.join("\n") : "";
+  const announcement = config?.announcement ?? {
+    enabled: false,
+    title: "",
+    content: "",
+    level: "info" as AnnouncementLevel,
+    updated_at: null,
+  };
 
   useEffect(() => {
     setWhitelistDraft(whitelistText);
@@ -48,6 +62,10 @@ export function ConfigCard() {
 
   const syncWhitelistDraft = () => {
     patchConfig({ email_domain_whitelist: parseWhitelistDraft() });
+  };
+
+  const patchAnnouncement = (updates: Partial<AnnouncementConfig>) => {
+    patchConfig({ announcement: { ...announcement, ...updates } });
   };
 
   const handleSaveConfig = async () => {
@@ -271,10 +289,60 @@ export function ConfigCard() {
             />
           </div>
           <div className="space-y-4 rounded-xl border border-stone-200 bg-white px-4 py-4 md:col-span-2">
-            <div>
-              <h2 className="text-sm font-semibold text-stone-900">SMTP 邮件发送</h2>
-              <p className="mt-1 text-xs leading-5 text-stone-500">用于发送注册验证码，密码和访问凭证不会回显。</p>
+            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+              <div>
+                <h2 className="text-sm font-semibold text-stone-900">站内公告</h2>
+                <p className="mt-1 text-xs leading-5 text-stone-500">登录用户会在顶部用户区域旁看到通知入口，公告按纯文本显示。</p>
+              </div>
+              <label className="flex items-center gap-3 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-700">
+                <Checkbox
+                  checked={Boolean(announcement.enabled)}
+                  onCheckedChange={(checked) => patchAnnouncement({ enabled: Boolean(checked) })}
+                />
+                发布公告
+              </label>
             </div>
+            <div className="grid gap-4 md:grid-cols-[180px_1fr]">
+              <div className="space-y-2">
+                <label className="text-sm text-stone-700">公告等级</label>
+                <Select value={announcement.level} onValueChange={(value) => patchAnnouncement({ level: value as AnnouncementLevel })}>
+                  <SelectTrigger className="h-10 rounded-xl border-stone-200 bg-stone-50">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="info">通知</SelectItem>
+                    <SelectItem value="success">完成</SelectItem>
+                    <SelectItem value="warning">提醒</SelectItem>
+                    <SelectItem value="danger">重要</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm text-stone-700">公告标题</label>
+                <Input
+                  value={announcement.title}
+                  onChange={(event) => patchAnnouncement({ title: event.target.value.slice(0, 80) })}
+                  placeholder="例如：本周模型额度维护通知"
+                  className="h-10 rounded-xl border-stone-200 bg-stone-50"
+                />
+                <p className="text-xs text-stone-500">最多 80 个字符。</p>
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <label className="text-sm text-stone-700">公告内容</label>
+                <Textarea
+                  value={announcement.content}
+                  onChange={(event) => patchAnnouncement({ content: event.target.value.slice(0, 2000) })}
+                  placeholder="写给登录用户看的公告内容，不支持 HTML。"
+                  className="min-h-28 rounded-xl border-stone-200 bg-stone-50 text-sm leading-6"
+                />
+                <div className="flex justify-between text-xs text-stone-500">
+                  <span>关闭“发布公告”后，用户通知入口会显示暂无公告。</span>
+                  <span>{announcement.content.length}/2000</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="space-y-4 rounded-xl border border-stone-200 bg-white px-4 py-4 md:col-span-2">
             <div className="grid gap-4 md:grid-cols-3">
               <div className="space-y-2">
                 <label className="text-sm text-stone-700">SMTP 服务器地址</label>

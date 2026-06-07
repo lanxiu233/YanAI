@@ -4,6 +4,7 @@ import { create } from "zustand";
 import { toast } from "sonner";
 
 import {
+  broadcastAnnouncementUpdated,
   createCPAPool,
   deleteCPAPool,
   fetchCPAPoolFiles,
@@ -17,6 +18,7 @@ import {
   updateCPAPool,
   updateRegisterConfig,
   updateSettingsConfig,
+  type AnnouncementConfig,
   type CPAPool,
   type CPARemoteFile,
   type RegisterConfig,
@@ -31,6 +33,34 @@ const DEFAULT_IMAGE_MODEL_MAPPINGS: Record<string, string> = {
   "gpt-image-2": "gpt-5-5",
   "codex-gpt-image-2": "codex-gpt-image-2",
 };
+
+const ANNOUNCEMENT_LEVELS: AnnouncementConfig["level"][] = ["info", "success", "warning", "danger"];
+
+const DEFAULT_ANNOUNCEMENT: AnnouncementConfig = {
+  enabled: false,
+  title: "",
+  content: "",
+  level: "info",
+  updated_at: null,
+};
+
+function limitText(value: unknown, limit: number) {
+  return String(value || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim().slice(0, limit);
+}
+
+function normalizeAnnouncement(value: SettingsConfig["announcement"]): AnnouncementConfig {
+  const raw = value && typeof value === "object" ? value : DEFAULT_ANNOUNCEMENT;
+  const levelText = String(raw.level || "info").trim().toLowerCase() as AnnouncementConfig["level"];
+  const title = limitText(raw.title, 80);
+  const content = limitText(raw.content, 2000);
+  return {
+    enabled: Boolean(raw.enabled) && Boolean(title || content),
+    title,
+    content,
+    level: ANNOUNCEMENT_LEVELS.includes(levelText) ? levelText : "info",
+    updated_at: raw.updated_at ? String(raw.updated_at) : null,
+  };
+}
 
 function normalizeConfig(config: SettingsConfig): SettingsConfig {
   const rawMappings = config.image_model_mappings;
@@ -78,6 +108,7 @@ function normalizeConfig(config: SettingsConfig): SettingsConfig {
       ...DEFAULT_IMAGE_MODEL_MAPPINGS,
       ...imageModelMappings,
     },
+    announcement: normalizeAnnouncement(config.announcement),
   };
 }
 
@@ -271,10 +302,12 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
           ...(config.image_model_mappings || {}),
           "gpt-image-2": String(config.image_model_mappings?.["gpt-image-2"] || DEFAULT_IMAGE_MODEL_MAPPINGS["gpt-image-2"]).trim(),
         },
+        announcement: normalizeAnnouncement(config.announcement),
       });
       set({
         config: normalizeConfig(data.config),
       });
+      broadcastAnnouncementUpdated();
       toast.success("配置已保存");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "保存系统配置失败");

@@ -18,6 +18,9 @@ CONFIG_FILE = BASE_DIR / "config.json"
 VERSION_FILE = BASE_DIR / "VERSION"
 SYSTEM_SETTING_SECRET_KEYS = {"auth-key", "smtp_password", "linuxdo_client_secret", "image_webdav_config"}
 SYSTEM_SETTING_TRANSIENT_KEYS = {"smtp_password_set", "linuxdo_client_secret_set", "image_webdav_password_set"}
+ANNOUNCEMENT_LEVELS = {"info", "success", "warning", "danger"}
+ANNOUNCEMENT_TITLE_LIMIT = 80
+ANNOUNCEMENT_CONTENT_LIMIT = 2000
 
 
 @dataclass(frozen=True)
@@ -58,6 +61,38 @@ def _clean_list(value: object) -> list[str]:
         seen.add(text)
         items.append(text)
     return items
+
+
+def _limit_text(value: object, limit: int) -> str:
+    return str(value or "").replace("\r\n", "\n").replace("\r", "\n").strip()[:limit]
+
+
+def _normalize_announcement(value: object, previous: object = None, *, stamp: bool = False) -> dict[str, object]:
+    raw = value if isinstance(value, dict) else {}
+    previous_raw = previous if isinstance(previous, dict) else {}
+    enabled = _bool(raw.get("enabled"), False)
+    title = _limit_text(raw.get("title"), ANNOUNCEMENT_TITLE_LIMIT)
+    content = _limit_text(raw.get("content"), ANNOUNCEMENT_CONTENT_LIMIT)
+    level = str(raw.get("level") or "info").strip().lower()
+    if level not in ANNOUNCEMENT_LEVELS:
+        level = "info"
+    visible = enabled and bool(title or content)
+    normalized = {
+        "enabled": visible,
+        "title": title,
+        "content": content,
+        "level": level,
+        "updated_at": str(raw.get("updated_at") or previous_raw.get("updated_at") or "").strip() or None,
+    }
+    if stamp:
+        previous_normalized = _normalize_announcement(previous_raw) if previous_raw else None
+        if previous_normalized is None or any(
+            normalized[key] != previous_normalized[key] for key in ("enabled", "title", "content", "level")
+        ):
+            normalized["updated_at"] = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+        if not visible and previous_normalized is None:
+            normalized["updated_at"] = None
+    return normalized
 
 
 def _parse_timestamp(value: object) -> float | None:
@@ -395,6 +430,10 @@ class ConfigStore:
         return mappings
 
     @property
+    def announcement(self) -> dict[str, object]:
+        return _normalize_announcement(self._get_config_value("announcement"))
+
+    @property
     def app_version(self) -> str:
         try:
             value = VERSION_FILE.read_text(encoding="utf-8").strip()
@@ -431,6 +470,7 @@ class ConfigStore:
         data["linuxdo_minimum_trust_level"] = self.linuxdo_minimum_trust_level
         data["linuxdo_client_secret_set"] = bool(self.linuxdo_client_secret)
         data["image_model_mappings"] = self.image_model_mappings
+        data["announcement"] = self.announcement
         data.pop("auth-key", None)
         data.pop("smtp_password", None)
         data.pop("linuxdo_client_secret", None)
@@ -449,6 +489,12 @@ class ConfigStore:
                 updates.pop(secret_key, None)
         if "email_domain_whitelist" in updates:
             updates["email_domain_whitelist"] = _clean_list(updates.get("email_domain_whitelist"))
+        if "announcement" in updates:
+            updates["announcement"] = _normalize_announcement(
+                updates.get("announcement"),
+                previous=self._get_config_value("announcement"),
+                stamp=True,
+            )
         provider = self._provider_if_initialized()
         if provider is not None:
             for key, value in updates.items():

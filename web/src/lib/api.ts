@@ -4,6 +4,15 @@ export type AccountType = "Free" | "Plus" | "ProLite" | "Pro" | "Team";
 export type AccountStatus = "正常" | "限流" | "异常" | "禁用";
 export type ImageModel = "gpt-image-2" | "codex-gpt-image-2";
 export type AuthRole = "admin" | "user";
+export type AnnouncementLevel = "info" | "success" | "warning" | "danger";
+
+export type AnnouncementConfig = {
+  enabled: boolean;
+  title: string;
+  content: string;
+  level: AnnouncementLevel;
+  updated_at?: string | null;
+};
 
 export type CredentialPreview = {
   present: boolean;
@@ -99,6 +108,7 @@ export type SettingsConfig = {
   linuxdo_client_secret_set?: boolean;
   linuxdo_minimum_trust_level?: number | string;
   image_model_mappings?: Record<string, string>;
+  announcement?: AnnouncementConfig;
   refresh_account_interval_minute?: number | string;
   image_retention_days?: number | string;
   auto_remove_invalid_accounts?: boolean;
@@ -506,8 +516,26 @@ export async function editImage(files: File | File[], prompt: string, model?: Im
   );
 }
 
+export const ANNOUNCEMENT_UPDATED_EVENT = "yanai:announcement-updated";
+
+export function broadcastAnnouncementUpdated() {
+  if (typeof window === "undefined") {
+    return;
+  }
+  window.dispatchEvent(new Event(ANNOUNCEMENT_UPDATED_EVENT));
+  try {
+    window.localStorage.setItem(ANNOUNCEMENT_UPDATED_EVENT, new Date().toISOString());
+  } catch {
+    // Storage can be unavailable in private mode; the in-page event still works.
+  }
+}
+
 export async function fetchSettingsConfig() {
   return httpRequest<{ config: SettingsConfig }>("/api/settings");
+}
+
+export async function fetchAnnouncement() {
+  return httpRequest<{ announcement: AnnouncementConfig }>("/api/announcement");
 }
 
 export async function updateSettingsConfig(settings: SettingsConfig) {

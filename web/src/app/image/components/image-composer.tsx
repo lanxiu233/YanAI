@@ -19,6 +19,7 @@ import {
   Share2,
   Scissors,
   Sparkles,
+  Star,
   SunMedium,
   WandSparkles,
   X,
@@ -43,6 +44,7 @@ const BANANA_PROMPTS_URL = `/banana-prompt-quicker/prompts.json?v=${BANANA_PROMP
 const BANANA_PROMPTS_ASSET_BASE_URL = "/banana-prompt-quicker/";
 const PROMPT_LIBRARY_API_TIMEOUT_MS = 2200;
 const QUICK_PROMPT_COUNT = 3;
+const FAVORITE_PROMPTS_STORAGE_KEY = "yanai:image:favorite-prompts";
 
 const GLASSES_PROMPT = `
 不知道自己适合佩戴什么样式的眼镜？
@@ -772,11 +774,37 @@ export function ImageComposer({
   const [bananaPromptQuery, setBananaPromptQuery] = useState("");
   const [bananaPromptCategory, setBananaPromptCategory] = useState("全部");
   const [bananaPromptRetryKey, setBananaPromptRetryKey] = useState(0);
+  const [favoritePromptIds, setFavoritePromptIds] = useState<string[]>([]);
   const sizeMenuRef = useRef<HTMLDivElement>(null);
   const lightboxImages = useMemo(
     () => referenceImages.map((image, index) => ({ id: `${image.name}-${index}`, src: image.dataUrl })),
     [referenceImages],
   );
+
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(FAVORITE_PROMPTS_STORAGE_KEY);
+      const parsed = raw ? JSON.parse(raw) : [];
+      setFavoritePromptIds(Array.isArray(parsed) ? parsed.map(String).filter(Boolean) : []);
+    } catch {
+      setFavoritePromptIds([]);
+    }
+  }, []);
+
+  const updateFavoritePromptIds = (updater: (current: string[]) => string[]) => {
+    setFavoritePromptIds((current) => {
+      const next = Array.from(new Set(updater(current)));
+      window.localStorage.setItem(FAVORITE_PROMPTS_STORAGE_KEY, JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const toggleFavoritePrompt = (item: PromptPickerItem) => {
+    const key = getPromptIdentityKey(item);
+    updateFavoritePromptIds((current) =>
+      current.includes(key) ? current.filter((id) => id !== key) : [key, ...current],
+    );
+  };
   const imageSizeOptions = [
     { value: "", label: "未指定" },
     { value: "1:1", label: "1:1 (正方形)" },
@@ -786,17 +814,22 @@ export function ImageComposer({
     { value: "9:16", label: "9:16 (竖版)" },
   ];
   const imageSizeLabel = imageSizeOptions.find((option) => option.value === imageSize)?.label || "未指定";
+  const favoritePromptIdSet = useMemo(() => new Set(favoritePromptIds), [favoritePromptIds]);
   const quickPromptItems = useMemo(() => {
-    const selected = sortPromptItems(bananaPrompts.filter((item) => item.quick_access)).slice(0, QUICK_PROMPT_COUNT);
+    const favoriteItems = sortPromptItems(bananaPrompts.filter((item) => favoritePromptIdSet.has(getPromptIdentityKey(item))));
+    const selected = uniquePromptItems([
+      ...favoriteItems,
+      ...sortPromptItems(bananaPrompts.filter((item) => item.quick_access)),
+    ]).slice(0, QUICK_PROMPT_COUNT);
     if (selected.length >= QUICK_PROMPT_COUNT) {
       return selected;
     }
-    const selectedIds = new Set(selected.map((item) => item.id).filter(Boolean));
+    const selectedKeys = new Set(selected.map(getPromptIdentityKey));
     const fallbackItems = defaultPromptItems
-      .filter((item) => item.quick_access && (!item.id || !selectedIds.has(item.id)))
+      .filter((item) => item.quick_access && !selectedKeys.has(getPromptIdentityKey(item)))
       .slice(0, QUICK_PROMPT_COUNT - selected.length);
     return [...selected, ...fallbackItems];
-  }, [bananaPrompts]);
+  }, [bananaPrompts, favoritePromptIdSet]);
   const morePromptItems = useMemo(
     () => uniquePromptItems([...quickPromptItems, ...bananaPrompts]),
     [bananaPrompts, quickPromptItems],
@@ -808,20 +841,22 @@ export function ImageComposer({
   }, [morePromptItems]);
   const filteredBananaPrompts = useMemo(() => {
     const query = bananaPromptQuery.trim().toLowerCase();
-    return morePromptItems.filter((item) => {
-      const categoryLabel = getPromptCategoryLabel(item);
-      const matchesCategory = bananaPromptCategory === "全部" || categoryLabel === bananaPromptCategory;
-      if (!matchesCategory) {
-        return false;
-      }
-      if (!query) {
-        return true;
-      }
-      return [item.title, item.description, item.prompt, item.category, item.sub_category, item.author]
-        .filter(Boolean)
-        .some((value) => String(value).toLowerCase().includes(query));
-    });
-  }, [bananaPromptCategory, bananaPromptQuery, morePromptItems]);
+    return morePromptItems
+      .filter((item) => {
+        const categoryLabel = getPromptCategoryLabel(item);
+        const matchesCategory = bananaPromptCategory === "全部" || categoryLabel === bananaPromptCategory;
+        if (!matchesCategory) {
+          return false;
+        }
+        if (!query) {
+          return true;
+        }
+        return [item.title, item.description, item.prompt, item.category, item.sub_category, item.author]
+          .filter(Boolean)
+          .some((value) => String(value).toLowerCase().includes(query));
+      })
+      .sort((a, b) => Number(favoritePromptIdSet.has(getPromptIdentityKey(b))) - Number(favoritePromptIdSet.has(getPromptIdentityKey(a))));
+  }, [bananaPromptCategory, bananaPromptQuery, favoritePromptIdSet, morePromptItems]);
 
   const handleBananaPromptSelect = (item: PromptPickerItem) => {
     onModeChange(normalizePromptMode(item.mode));
@@ -948,8 +983,15 @@ export function ImageComposer({
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="border-b border-rose-100/70 px-4 py-4">
-        <div className="text-base font-bold text-stone-950">Prompt 创作台</div>
-        <div className="mt-1 text-sm text-stone-500">图像生成 · 参考图编辑</div>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div className="text-base font-bold text-stone-950">创作参数</div>
+            <div className="mt-1 text-sm text-stone-500">模板 · 参考图 · 比例 · 张数</div>
+          </div>
+          <div className="rounded-full bg-white/70 px-3 py-1 text-xs font-semibold text-rose-600">
+            {mode === "edit" ? "图生图" : "文生图"}
+          </div>
+        </div>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
@@ -1033,6 +1075,7 @@ export function ImageComposer({
           <div className="grid grid-cols-2 gap-2">
             {quickPromptItems.map((item, index) => {
               const active = item.id === activePresetId;
+              const favorite = favoritePromptIdSet.has(getPromptIdentityKey(item));
               const PresetIcon = getPromptIcon(item);
               return (
                 <button
@@ -1054,11 +1097,37 @@ export function ImageComposer({
                   >
                     <PresetIcon className="size-4" />
                   </span>
-                  <span className="min-w-0">
+                  <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-semibold">{item.title}</span>
                     <span className={cn("mt-0.5 block truncate text-xs", active ? "text-white/70" : "text-stone-500")}>
                       {getPromptDescription(item)}
                     </span>
+                  </span>
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      toggleFavoritePrompt(item);
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        toggleFavoritePrompt(item);
+                      }
+                    }}
+                    className={cn(
+                      "inline-flex size-8 shrink-0 items-center justify-center rounded-full transition",
+                      favorite
+                        ? "bg-amber-100 text-amber-600"
+                        : active
+                          ? "bg-white/10 text-white/62 hover:text-white"
+                          : "bg-white/65 text-stone-300 hover:text-amber-500",
+                    )}
+                    aria-label={favorite ? "取消收藏提示词" : "收藏提示词"}
+                  >
+                    <Star className={cn("size-4", favorite && "fill-current")} />
                   </span>
                 </button>
               );
@@ -1192,6 +1261,7 @@ export function ImageComposer({
                 <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                   {filteredBananaPrompts.map((item, index) => {
                     const previewUrl = getBananaPromptPreviewUrl(item);
+                    const favorite = favoritePromptIdSet.has(getPromptIdentityKey(item));
                     return (
                       <article
                         key={`${item.title}-${item.created || index}`}
@@ -1230,14 +1300,29 @@ export function ImageComposer({
                             <div className="min-w-0 truncate text-xs text-stone-400">
                               {item.author ? `作者 ${item.author}` : "提示词管理"}
                             </div>
-                            <Button
-                              type="button"
-                              size="sm"
-                            className="h-8 shrink-0 rounded-lg text-white"
-                              onClick={() => handleBananaPromptSelect(item)}
-                            >
-                              使用
-                            </Button>
+                            <div className="flex shrink-0 items-center gap-2">
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                className={cn(
+                                  "h-8 rounded-lg border-rose-100 bg-white px-2.5",
+                                  favorite ? "text-amber-600" : "text-stone-500",
+                                )}
+                                onClick={() => toggleFavoritePrompt(item)}
+                              >
+                                <Star className={cn("size-4", favorite && "fill-current")} />
+                                {favorite ? "已收藏" : "收藏"}
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                className="h-8 rounded-lg text-white"
+                                onClick={() => handleBananaPromptSelect(item)}
+                              >
+                                使用
+                              </Button>
+                            </div>
                           </div>
                         </div>
                       </article>
@@ -1249,7 +1334,13 @@ export function ImageComposer({
           </DialogContent>
         </Dialog>
 
-        <div className="yan-panel-strong rounded-lg">
+        <div className="yan-panel-strong overflow-hidden rounded-lg">
+          <div className="border-b border-rose-100/70 px-4 py-3">
+            <div className="text-sm font-bold text-stone-950">第 2 步：描述你要的画面</div>
+            <div className="mt-1 text-xs text-stone-500">
+              {mode === "edit" ? "上传参考图后，说明要保留什么、改变什么。" : "可以直接输入，也可以先从上方模板开始。"}
+            </div>
+          </div>
           <div
             className="relative cursor-text"
             onClick={() => {
@@ -1364,7 +1455,7 @@ export function ImageComposer({
                   aria-label={mode === "edit" ? "编辑图片" : "生成图片"}
                 >
                   <ArrowUp className="size-4" />
-                  <span>{mode === "edit" ? "编辑图片" : "生成图片"}</span>
+                  <span>{mode === "edit" ? "开始编辑参考图" : "开始生成图片"}</span>
                 </button>
               </div>
             </div>
