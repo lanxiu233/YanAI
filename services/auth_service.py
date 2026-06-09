@@ -13,6 +13,7 @@ from services.registration_security import validate_registration_email, verify_r
 from services.repositories.base import RepositoryProvider
 from services.repositories.storage_adapter import RepositoryStorageAdapter
 from services.storage.base import StorageBackend
+from utils.timezone import CHINA_TIMEZONE
 
 AuthRole = Literal["admin", "user"]
 
@@ -107,12 +108,14 @@ class AuthService:
         name = self._clean(raw.get("name")) or ("管理员密钥" if role == "admin" else "普通用户")
         created_at = self._clean(raw.get("created_at")) or _now_iso()
         last_used_at = self._clean(raw.get("last_used_at")) or None
+        owner_user_id = self._clean(raw.get("owner_user_id")) or None
         return {
             "id": item_id,
             "name": name,
             "role": role,
             "key_hash": key_hash,
             "enabled": bool(raw.get("enabled", True)),
+            "owner_user_id": owner_user_id,
             "created_at": created_at,
             "last_used_at": last_used_at,
         }
@@ -151,6 +154,9 @@ class AuthService:
             "linuxdo_username": self._clean(raw.get("linuxdo_username")) or None,
             "linuxdo_trust_level": int(raw.get("linuxdo_trust_level") or 0),
             "webdav_config": raw.get("webdav_config") if isinstance(raw.get("webdav_config"), dict) else {},
+            "last_checkin_date": self._clean(raw.get("last_checkin_date")) or None,
+            "last_checkin_amount": max(0, int(raw.get("last_checkin_amount") or 0)),
+            "last_checkin_at": self._clean(raw.get("last_checkin_at")) or None,
             "created_at": self._clean(raw.get("created_at")) or _now_iso(),
             "updated_at": self._clean(raw.get("updated_at")) or _now_iso(),
             "last_login_at": self._clean(raw.get("last_login_at")) or None,
@@ -267,6 +273,7 @@ class AuthService:
             "name": item.get("name"),
             "role": item.get("role"),
             "enabled": bool(item.get("enabled", True)),
+            "owner_user_id": item.get("owner_user_id"),
             "created_at": item.get("created_at"),
             "last_used_at": item.get("last_used_at"),
         }
@@ -288,6 +295,9 @@ class AuthService:
             "linuxdo_id": user.get("linuxdo_id"),
             "linuxdo_username": user.get("linuxdo_username"),
             "linuxdo_trust_level": int(user.get("linuxdo_trust_level") or 0),
+            "last_checkin_date": user.get("last_checkin_date"),
+            "last_checkin_amount": int(user.get("last_checkin_amount") or 0),
+            "last_checkin_at": user.get("last_checkin_at"),
             "image_count": int((stats or {}).get("image_count") or 0),
             "spent_quota": int((stats or {}).get("spent_quota") or int(user.get("quota_used") or 0)),
         }
@@ -331,13 +341,26 @@ class AuthService:
             item["spent_quota"] += max(0, int(record.get("quota_cost") or 0))
         return stats
 
-    def list_keys(self, role: AuthRole | None = None) -> list[dict[str, object]]:
+    def list_keys(self, role: AuthRole | None = None, owner_user_id: str | None = None) -> list[dict[str, object]]:
+        normalized_owner_id = self._clean(owner_user_id)
         with self._lock:
-            items = [item for item in self._items if role is None or item.get("role") == role]
+            items = [
+                item
+                for item in self._items
+                if (role is None or item.get("role") == role)
+                and (not normalized_owner_id or self._clean(item.get("owner_user_id")) == normalized_owner_id)
+            ]
             return [self._public_item(item) for item in items]
 
-    def create_key(self, *, role: AuthRole, name: str = "") -> tuple[dict[str, object], str]:
+    def create_key(
+        self,
+        *,
+        role: AuthRole,
+        name: str = "",
+        owner_user_id: str | None = None,
+    ) -> tuple[dict[str, object], str]:
         normalized_name = self._clean(name) or ("管理员密钥" if role == "admin" else "普通用户")
+        normalized_owner_id = self._clean(owner_user_id)
         raw_key = f"sk-{secrets.token_urlsafe(24)}"
         item = {
             "id": uuid.uuid4().hex[:12],
@@ -345,6 +368,7 @@ class AuthService:
             "role": role,
             "key_hash": _hash_key(raw_key),
             "enabled": True,
+            "owner_user_id": normalized_owner_id or None,
             "created_at": _now_iso(),
             "last_used_at": None,
         }
@@ -359,8 +383,10 @@ class AuthService:
         updates: dict[str, object],
         *,
         role: AuthRole | None = None,
+        owner_user_id: str | None = None,
     ) -> dict[str, object] | None:
         normalized_id = self._clean(key_id)
+        normalized_owner_id = self._clean(owner_user_id)
         if not normalized_id:
             return None
         with self._lock:
@@ -368,6 +394,8 @@ class AuthService:
                 if item.get("id") != normalized_id:
                     continue
                 if role is not None and item.get("role") != role:
+                    return None
+                if normalized_owner_id and self._clean(item.get("owner_user_id")) != normalized_owner_id:
                     return None
                 next_item = dict(item)
                 if "name" in updates and updates.get("name") is not None:
@@ -379,8 +407,15 @@ class AuthService:
                 return self._public_item(next_item)
         return None
 
-    def delete_key(self, key_id: str, *, role: AuthRole | None = None) -> bool:
+    def delete_key(
+        self,
+        key_id: str,
+        *,
+        role: AuthRole | None = None,
+        owner_user_id: str | None = None,
+    ) -> bool:
         normalized_id = self._clean(key_id)
+        normalized_owner_id = self._clean(owner_user_id)
         if not normalized_id:
             return False
         with self._lock:
@@ -388,7 +423,11 @@ class AuthService:
             self._items = [
                 item
                 for item in self._items
-                if not (item.get("id") == normalized_id and (role is None or item.get("role") == role))
+                if not (
+                    item.get("id") == normalized_id
+                    and (role is None or item.get("role") == role)
+                    and (not normalized_owner_id or self._clean(item.get("owner_user_id")) == normalized_owner_id)
+                )
             ]
             if len(self._items) == before:
                 return False
@@ -568,8 +607,14 @@ class AuthService:
                 for session in self._sessions
                 if self._clean(session.get("user_id")) != normalized_id
             ]
+            self._items = [
+                item
+                for item in self._items
+                if self._clean(item.get("owner_user_id")) != normalized_id
+            ]
             self._save_users()
             self._save_sessions()
+            self._save_keys()
             return True
 
     def delete_users(self, user_ids: list[str]) -> int:
@@ -592,8 +637,14 @@ class AuthService:
                 for session in self._sessions
                 if self._clean(session.get("user_id")) not in normalized_ids
             ]
+            self._items = [
+                item
+                for item in self._items
+                if self._clean(item.get("owner_user_id")) not in normalized_ids
+            ]
             self._save_users()
             self._save_sessions()
+            self._save_keys()
             return removed
 
     def reset_password(self, user_id: str, password: str | None = None) -> tuple[dict[str, object], str] | None:
@@ -626,6 +677,70 @@ class AuthService:
             self._users[index] = self._normalize_user(user) or user
             self._save_users()
             return self._public_user(self._users[index])
+
+    def check_in_status(self, user_id: str, *, today: str | None = None) -> dict[str, object] | None:
+        normalized_id = self._clean(user_id)
+        today_text = self._clean(today) or datetime.now(CHINA_TIMEZONE).date().isoformat()
+        with self._lock:
+            index = self._find_user_index_by_id(normalized_id)
+            if index < 0:
+                return None
+            user = self._users[index]
+            last_date = self._clean(user.get("last_checkin_date"))
+            return {
+                "claimed_today": last_date == today_text,
+                "last_checkin_date": last_date or None,
+                "last_checkin_amount": int(user.get("last_checkin_amount") or 0),
+                "last_checkin_at": user.get("last_checkin_at"),
+            }
+
+    def check_in_user(
+        self,
+        user_id: str,
+        *,
+        min_quota: int,
+        max_quota: int,
+        today: str | None = None,
+    ) -> dict[str, object]:
+        normalized_id = self._clean(user_id)
+        today_text = self._clean(today) or datetime.now(CHINA_TIMEZONE).date().isoformat()
+        low = max(0, int(min_quota or 0))
+        high = max(0, int(max_quota or 0))
+        if high < low:
+            low, high = high, low
+        amount_range = high - low + 1
+        with self._lock:
+            index = self._find_user_index_by_id(normalized_id)
+            if index < 0:
+                raise ValueError("user not found")
+            current = dict(self._users[index])
+            if current.get("role") != "user":
+                raise ValueError("user permission required")
+            if self._clean(current.get("last_checkin_date")) == today_text:
+                return {
+                    "checked_in": False,
+                    "amount": 0,
+                    "last_checkin_date": today_text,
+                    "user": self._public_user(current),
+                }
+            amount = low if amount_range <= 1 else low + secrets.randbelow(amount_range)
+            now = _now_iso()
+            current["quota"] = int(current.get("quota") or 0) + amount
+            current["last_checkin_date"] = today_text
+            current["last_checkin_amount"] = amount
+            current["last_checkin_at"] = now
+            current["updated_at"] = now
+            user = self._normalize_user(current)
+            if user is None:
+                raise ValueError("user payload is invalid")
+            self._users[index] = user
+            self._save_users()
+            return {
+                "checked_in": True,
+                "amount": amount,
+                "last_checkin_date": today_text,
+                "user": self._public_user(user),
+            }
 
     def login_or_register_linuxdo(self, profile: dict[str, object]) -> tuple[dict[str, object], str, bool]:
         linuxdo_id = self._clean(profile.get("provider_user_id"))
@@ -1043,6 +1158,18 @@ class AuthService:
                         self._last_used_flush_at[item_id] = now
                     except Exception:
                         pass
+                owner_user_id = self._clean(next_item.get("owner_user_id"))
+                if next_item.get("role") == "user" and owner_user_id:
+                    user_index = self._find_user_index_by_id(owner_user_id)
+                    if user_index < 0:
+                        return None
+                    user = self._users[user_index]
+                    if user.get("status") != "active":
+                        return None
+                    identity = self._public_user(user)
+                    identity["auth_key_id"] = next_item.get("id")
+                    identity["auth_key_name"] = next_item.get("name")
+                    return identity
                 return self._public_item(next_item)
 
             for index, session in enumerate(self._sessions):

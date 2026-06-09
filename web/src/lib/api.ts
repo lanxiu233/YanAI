@@ -88,6 +88,8 @@ export type SettingsConfig = {
   base_url?: string;
   allow_user_registration?: boolean;
   new_user_initial_quota?: number | string;
+  daily_checkin_min_quota?: number | string;
+  daily_checkin_max_quota?: number | string;
   email_verification_enabled?: boolean;
   email_domain_whitelist_enabled?: boolean;
   email_alias_restriction_enabled?: boolean;
@@ -297,6 +299,9 @@ export type CurrentUser = {
   created_at?: string | null;
   updated_at?: string | null;
   last_login_at?: string | null;
+  last_checkin_date?: string | null;
+  last_checkin_amount?: number;
+  last_checkin_at?: string | null;
 };
 
 export type RegisterOptions = {
@@ -323,8 +328,18 @@ export type UserKey = {
   name: string;
   role: "user";
   enabled: boolean;
+  owner_user_id?: string | null;
   created_at: string | null;
   last_used_at: string | null;
+};
+
+export type CheckinStatus = {
+  claimed_today: boolean;
+  last_checkin_date?: string | null;
+  last_checkin_amount?: number;
+  last_checkin_at?: string | null;
+  min_quota: number;
+  max_quota: number;
 };
 
 export type RegisterConfig = {
@@ -422,6 +437,46 @@ export async function redeemMyCode(code: string) {
   return httpRequest<{ user: CurrentUser; redeem_code: RedeemCode }>("/api/me/redeem", {
     method: "POST",
     body: { code },
+  });
+}
+
+export async function fetchMyCheckinStatus() {
+  return httpRequest<{ checkin: CheckinStatus }>("/api/me/checkin");
+}
+
+export async function checkInToday() {
+  return httpRequest<{
+    checked_in: boolean;
+    amount: number;
+    last_checkin_date: string;
+    user: CurrentUser;
+    checkin: CheckinStatus;
+  }>("/api/me/checkin", {
+    method: "POST",
+  });
+}
+
+export async function fetchMyUserKeys() {
+  return httpRequest<{ items: UserKey[] }>("/api/me/keys");
+}
+
+export async function createMyUserKey(name: string) {
+  return httpRequest<{ item: UserKey; key: string; items: UserKey[] }>("/api/me/keys", {
+    method: "POST",
+    body: { name },
+  });
+}
+
+export async function updateMyUserKey(keyId: string, updates: { enabled?: boolean; name?: string }) {
+  return httpRequest<{ item: UserKey; items: UserKey[] }>(`/api/me/keys/${keyId}`, {
+    method: "POST",
+    body: updates,
+  });
+}
+
+export async function deleteMyUserKey(keyId: string) {
+  return httpRequest<{ items: UserKey[] }>(`/api/me/keys/${keyId}`, {
+    method: "DELETE",
   });
 }
 

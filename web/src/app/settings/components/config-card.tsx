@@ -221,6 +221,34 @@ export function ConfigCard() {
             />
             <p className="text-xs text-stone-500">邮箱注册和 Linux DO 首次登录创建的新用户都会获得该额度。</p>
           </div>
+          <div className="space-y-2">
+            <label className="text-sm text-stone-700">签到最小额度</label>
+            <Input
+              type="number"
+              min={0}
+              step={1}
+              inputMode="numeric"
+              value={String(config?.daily_checkin_min_quota ?? "")}
+              onChange={(event) => patchConfig({ daily_checkin_min_quota: event.target.value })}
+              placeholder="1"
+              className="h-10 rounded-xl border-stone-200 bg-white"
+            />
+            <p className="text-xs text-stone-500">普通用户每日签到随机获得的最低额度。</p>
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm text-stone-700">签到最大额度</label>
+            <Input
+              type="number"
+              min={0}
+              step={1}
+              inputMode="numeric"
+              value={String(config?.daily_checkin_max_quota ?? "")}
+              onChange={(event) => patchConfig({ daily_checkin_max_quota: event.target.value })}
+              placeholder="5"
+              className="h-10 rounded-xl border-stone-200 bg-white"
+            />
+            <p className="text-xs text-stone-500">保存时会自动保证最大值不小于最小值。</p>
+          </div>
           <label className="flex items-center gap-3 rounded-xl border border-stone-200 bg-white px-4 py-3 text-sm text-stone-700">
             <Checkbox
               checked={Boolean(config?.auto_remove_invalid_accounts)}

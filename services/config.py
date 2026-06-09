@@ -273,6 +273,21 @@ class ConfigStore:
             return 0
 
     @property
+    def daily_checkin_min_quota(self) -> int:
+        try:
+            return max(0, int(self._get_config_value("daily_checkin_min_quota", 1)))
+        except (TypeError, ValueError):
+            return 1
+
+    @property
+    def daily_checkin_max_quota(self) -> int:
+        try:
+            minimum = self.daily_checkin_min_quota
+            return max(minimum, int(self._get_config_value("daily_checkin_max_quota", 5)))
+        except (TypeError, ValueError):
+            return max(1, self.daily_checkin_min_quota)
+
+    @property
     def email_verification_enabled(self) -> bool:
         return _bool(self._get_config_value("email_verification_enabled"), False)
 
@@ -452,6 +467,8 @@ class ConfigStore:
         data["log_levels"] = self.log_levels
         data["allow_user_registration"] = self.allow_user_registration
         data["new_user_initial_quota"] = self.new_user_initial_quota
+        data["daily_checkin_min_quota"] = self.daily_checkin_min_quota
+        data["daily_checkin_max_quota"] = self.daily_checkin_max_quota
         data["email_verification_enabled"] = self.email_verification_enabled
         data["email_domain_whitelist_enabled"] = self.email_domain_whitelist_enabled
         data["email_alias_restriction_enabled"] = self.email_alias_restriction_enabled

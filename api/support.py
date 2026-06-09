@@ -11,6 +11,7 @@ from services.config import config
 
 BASE_DIR = Path(__file__).resolve().parents[1]
 WEB_DIST_DIR = BASE_DIR / "web_dist"
+WEB_OUT_DIR = BASE_DIR / "web" / "out"
 
 
 def extract_bearer_token(authorization: str | None) -> str:
@@ -85,15 +86,15 @@ def start_limited_account_watcher(stop_event: Event) -> Thread:
     def worker() -> None:
         while not stop_event.is_set():
             try:
-                limited_tokens = account_service.list_limited_tokens()
-                if limited_tokens:
-                    print(f"[account-limited-watcher] checking {len(limited_tokens)} limited accounts")
-                    account_service.refresh_accounts(limited_tokens)
+                tokens = account_service.list_tokens()
+                if tokens:
+                    print(f"[account-refresh-watcher] checking {len(tokens)} accounts")
+                    account_service.refresh_accounts(tokens)
             except Exception as exc:
-                print(f"[account-limited-watcher] fail {exc}")
+                print(f"[account-refresh-watcher] fail {exc}")
             stop_event.wait(interval_seconds)
 
-    thread = Thread(target=worker, name="limited-account-watcher", daemon=True)
+    thread = Thread(target=worker, name="account-refresh-watcher", daemon=True)
     thread.start()
     return thread
 
@@ -115,10 +116,11 @@ def start_quota_reservation_watcher(stop_event: Event) -> Thread:
 
 
 def resolve_web_asset(requested_path: str) -> Path | None:
-    if not WEB_DIST_DIR.exists():
+    web_root = WEB_DIST_DIR if WEB_DIST_DIR.exists() else WEB_OUT_DIR
+    if not web_root.exists():
         return None
     clean_path = requested_path.strip("/")
-    base_dir = WEB_DIST_DIR.resolve()
+    base_dir = web_root.resolve()
     candidates = [base_dir / "index.html"] if not clean_path else [
         base_dir / Path(clean_path),
         base_dir / clean_path / "index.html",

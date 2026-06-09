@@ -69,6 +69,15 @@ class RedeemRequest(BaseModel):
     code: str
 
 
+class UserKeyCreateRequest(BaseModel):
+    name: str = ""
+
+
+class UserKeyUpdateRequest(BaseModel):
+    name: str | None = None
+    enabled: bool | None = None
+
+
 class AdminUserCreateRequest(BaseModel):
     email: str
     password: str
@@ -293,6 +302,99 @@ def create_router() -> APIRouter:
         except ValueError as exc:
             raise HTTPException(status_code=400, detail={"error": str(exc)}) from exc
         return {"user": user, "redeem_code": code}
+
+    @router.get("/api/me/checkin")
+    async def get_checkin_status(authorization: str | None = Header(default=None)):
+        identity = require_identity(authorization)
+        if identity.get("role") != "user":
+            raise HTTPException(status_code=403, detail={"error": "user permission required"})
+        status = auth_service.check_in_status(str(identity.get("id") or ""))
+        if status is None:
+            raise HTTPException(status_code=404, detail={"error": "user not found"})
+        return {
+            "checkin": {
+                **status,
+                "min_quota": config.daily_checkin_min_quota,
+                "max_quota": config.daily_checkin_max_quota,
+            }
+        }
+
+    @router.post("/api/me/checkin")
+    async def check_in(authorization: str | None = Header(default=None)):
+        identity = require_identity(authorization)
+        if identity.get("role") != "user":
+            raise HTTPException(status_code=403, detail={"error": "user permission required"})
+        try:
+            result = auth_service.check_in_user(
+                str(identity.get("id") or ""),
+                min_quota=config.daily_checkin_min_quota,
+                max_quota=config.daily_checkin_max_quota,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail={"error": str(exc)}) from exc
+        return {
+            **result,
+            "checkin": {
+                "claimed_today": True,
+                "last_checkin_date": result.get("last_checkin_date"),
+                "last_checkin_amount": result.get("amount"),
+                "min_quota": config.daily_checkin_min_quota,
+                "max_quota": config.daily_checkin_max_quota,
+            },
+        }
+
+    @router.get("/api/me/keys")
+    async def list_my_keys(authorization: str | None = Header(default=None)):
+        identity = require_identity(authorization)
+        if identity.get("role") != "user":
+            raise HTTPException(status_code=403, detail={"error": "user permission required"})
+        return {"items": auth_service.list_keys(role="user", owner_user_id=str(identity.get("id") or ""))}
+
+    @router.post("/api/me/keys")
+    async def create_my_key(body: UserKeyCreateRequest, authorization: str | None = Header(default=None)):
+        identity = require_identity(authorization)
+        if identity.get("role") != "user":
+            raise HTTPException(status_code=403, detail={"error": "user permission required"})
+        item, raw_key = auth_service.create_key(
+            role="user",
+            name=body.name,
+            owner_user_id=str(identity.get("id") or ""),
+        )
+        return {
+            "item": item,
+            "key": raw_key,
+            "items": auth_service.list_keys(role="user", owner_user_id=str(identity.get("id") or "")),
+        }
+
+    @router.post("/api/me/keys/{key_id}")
+    async def update_my_key(key_id: str, body: UserKeyUpdateRequest, authorization: str | None = Header(default=None)):
+        identity = require_identity(authorization)
+        if identity.get("role") != "user":
+            raise HTTPException(status_code=403, detail={"error": "user permission required"})
+        updates = body.model_dump(exclude_unset=True, exclude_none=True)
+        if not updates:
+            raise HTTPException(status_code=400, detail={"error": "no updates provided"})
+        item = auth_service.update_key(
+            key_id,
+            updates,
+            role="user",
+            owner_user_id=str(identity.get("id") or ""),
+        )
+        if item is None:
+            raise HTTPException(status_code=404, detail={"error": "user key not found"})
+        return {
+            "item": item,
+            "items": auth_service.list_keys(role="user", owner_user_id=str(identity.get("id") or "")),
+        }
+
+    @router.delete("/api/me/keys/{key_id}")
+    async def delete_my_key(key_id: str, authorization: str | None = Header(default=None)):
+        identity = require_identity(authorization)
+        if identity.get("role") != "user":
+            raise HTTPException(status_code=403, detail={"error": "user permission required"})
+        if not auth_service.delete_key(key_id, role="user", owner_user_id=str(identity.get("id") or "")):
+            raise HTTPException(status_code=404, detail={"error": "user key not found"})
+        return {"items": auth_service.list_keys(role="user", owner_user_id=str(identity.get("id") or ""))}
 
     @router.get("/api/me/images")
     async def get_my_images(

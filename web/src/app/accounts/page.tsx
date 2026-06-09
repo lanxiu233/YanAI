@@ -44,6 +44,7 @@ import {
   deleteAccounts,
   exportAccounts,
   fetchAccounts,
+  fetchSettingsConfig,
   refreshAccounts,
   updateAccount,
   type Account,
@@ -225,6 +226,7 @@ function AccountsPageContent() {
   const [isExportingSelected, setIsExportingSelected] = useState(false);
   const [isCopyingAccountJson, setIsCopyingAccountJson] = useState(false);
   const [copyingExportField, setCopyingExportField] = useState<string | null>(null);
+  const [autoRefreshMinutes, setAutoRefreshMinutes] = useState(0);
 
   const loadAccounts = async (silent = false) => {
     if (!silent) {
@@ -250,6 +252,11 @@ function AccountsPageContent() {
     }
     didLoadRef.current = true;
     void loadAccounts();
+    void fetchSettingsConfig()
+      .then((data) => {
+        setAutoRefreshMinutes(Math.max(0, Number(data.config.refresh_account_interval_minute) || 0));
+      })
+      .catch(() => setAutoRefreshMinutes(0));
   }, []);
 
   const filteredAccounts = useMemo(() => {
@@ -350,6 +357,19 @@ function AccountsPageContent() {
       setIsRefreshing(false);
     }
   };
+
+  useEffect(() => {
+    if (autoRefreshMinutes <= 0 || accounts.length === 0) {
+      return;
+    }
+    const intervalId = window.setInterval(() => {
+      if (document.visibilityState === "hidden" || isRefreshing || isDeleting) {
+        return;
+      }
+      void handleRefreshAccounts(accounts.map((item) => item.access_token));
+    }, autoRefreshMinutes * 60 * 1000);
+    return () => window.clearInterval(intervalId);
+  }, [accounts, autoRefreshMinutes, isDeleting, isRefreshing]);
 
   const handleCopyVisibleValue = async (label: string, value?: string | null) => {
     const text = String(value || "").trim();
@@ -511,6 +531,11 @@ function AccountsPageContent() {
         </div>
 
         <div className="grid w-full gap-2 sm:grid-cols-2 lg:w-auto lg:grid-cols-none lg:flex lg:flex-wrap lg:items-center lg:justify-end">
+          {autoRefreshMinutes > 0 ? (
+            <div className="flex h-10 items-center justify-center rounded-xl border border-stone-200 bg-white/70 px-3 text-xs font-medium text-stone-500 lg:w-auto">
+              每 {autoRefreshMinutes} 分钟自动全量刷新
+            </div>
+          ) : null}
           <Button
             variant="outline"
             className="h-10 w-full justify-center rounded-xl border-stone-200 bg-white/80 px-4 text-stone-700 hover:bg-white lg:w-auto"

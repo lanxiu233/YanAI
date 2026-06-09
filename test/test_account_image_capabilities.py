@@ -159,6 +159,66 @@ class AuthServiceTests(unittest.TestCase):
             self.assertFalse(service.delete_key(item["id"], role="user"))
             self.assertEqual(service.list_keys(role="user"), [])
 
+    def test_user_owned_key_authenticates_as_that_user(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            service = AuthService(JSONStorageBackend(Path(tmp_dir) / "accounts.json", Path(tmp_dir) / "auth_keys.json"))
+            user, _ = service.create_user(
+                email="alice@example.com",
+                password="secret-123",
+                name="Alice",
+                quota=7,
+            )
+
+            item, raw_key = service.create_key(role="user", name="Alice API", owner_user_id=str(user["id"]))
+            authed = service.authenticate(raw_key)
+
+            self.assertEqual(item["owner_user_id"], user["id"])
+            self.assertIsNotNone(authed)
+            self.assertEqual(authed["id"], user["id"])
+            self.assertEqual(authed["email"], "alice@example.com")
+            self.assertEqual(authed["quota"], 7)
+
+    def test_user_owned_key_is_removed_when_user_is_deleted(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            service = AuthService(JSONStorageBackend(Path(tmp_dir) / "accounts.json", Path(tmp_dir) / "auth_keys.json"))
+            user, _ = service.create_user(
+                email="alice@example.com",
+                password="secret-123",
+                name="Alice",
+                quota=7,
+            )
+            item, raw_key = service.create_key(role="user", name="Alice API", owner_user_id=str(user["id"]))
+
+            self.assertTrue(service.delete_user(str(user["id"])))
+
+            self.assertIsNone(service.authenticate(raw_key))
+            self.assertEqual(service.list_keys(role="user", owner_user_id=str(user["id"])), [])
+            self.assertFalse(service.delete_key(str(item["id"]), role="user", owner_user_id=str(user["id"])))
+
+    def test_check_in_awards_random_quota_once_per_day(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            service = AuthService(JSONStorageBackend(Path(tmp_dir) / "accounts.json", Path(tmp_dir) / "auth_keys.json"))
+            user, _ = service.create_user(
+                email="alice@example.com",
+                password="secret-123",
+                name="Alice",
+                quota=7,
+            )
+
+            first = service.check_in_user(str(user["id"]), min_quota=2, max_quota=5, today="2026-06-09")
+
+            self.assertTrue(first["checked_in"])
+            self.assertGreaterEqual(first["amount"], 2)
+            self.assertLessEqual(first["amount"], 5)
+            self.assertEqual(first["user"]["quota"], 7 + first["amount"])
+            self.assertEqual(first["last_checkin_date"], "2026-06-09")
+
+            second = service.check_in_user(str(user["id"]), min_quota=2, max_quota=5, today="2026-06-09")
+
+            self.assertFalse(second["checked_in"])
+            self.assertEqual(second["amount"], 0)
+            self.assertEqual(second["user"]["quota"], first["user"]["quota"])
+
     def test_authenticate_ignores_last_used_save_failure(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             service = AuthService(JSONStorageBackend(Path(tmp_dir) / "accounts.json", Path(tmp_dir) / "auth_keys.json"))
