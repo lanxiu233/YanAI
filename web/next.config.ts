@@ -17,7 +17,7 @@ function readAppVersion() {
 const appVersion = process.env.NEXT_PUBLIC_APP_VERSION || readAppVersion()
 
 const nextConfig: NextConfig = {
-    allowedDevOrigins: ['127.0.0.1'],
+    allowedDevOrigins: ['127.0.0.1', '192.168.8.66'],
     env: {
         NEXT_PUBLIC_APP_VERSION: appVersion,
     },

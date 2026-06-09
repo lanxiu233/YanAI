@@ -33,6 +33,7 @@ type ImportMethod = "menu" | "token" | "session" | "cpa";
 
 type AccountImportDialogProps = {
   disabled?: boolean;
+  triggerClassName?: string;
   onImported: (items: Account[]) => void;
 };
 
@@ -110,7 +111,7 @@ function MethodCard({
   );
 }
 
-export function AccountImportDialog({ disabled, onImported }: AccountImportDialogProps) {
+export function AccountImportDialog({ disabled, triggerClassName, onImported }: AccountImportDialogProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [method, setMethod] = useState<ImportMethod>("menu");
@@ -461,7 +462,7 @@ export function AccountImportDialog({ disabled, onImported }: AccountImportDialo
     <>
       <Dialog open={open} onOpenChange={handleOpenChange}>
         <Button
-          className="h-10 rounded-xl bg-stone-950 px-4 text-white hover:bg-stone-800"
+          className={cn("h-10 rounded-xl bg-stone-950 px-4 text-white hover:bg-stone-800", triggerClassName)}
           onClick={() => setOpen(true)}
           disabled={disabled}
         >

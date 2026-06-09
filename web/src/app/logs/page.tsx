@@ -133,9 +133,9 @@ function LogsContent() {
           <div className="text-xs font-semibold tracking-[0.18em] text-stone-500 uppercase">Logs</div>
           <h1 className="text-2xl font-semibold tracking-tight">日志管理</h1>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="grid w-full gap-2 sm:grid-cols-2 xl:w-auto xl:grid-cols-[150px_120px_208px_240px_auto_auto]">
           <Select value={type} onValueChange={setType}>
-            <SelectTrigger className="h-10 w-[150px] rounded-xl border-stone-200 bg-white"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="h-10 w-full rounded-xl border-stone-200 bg-white"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value={LogType.Call}>调用日志</SelectItem>
               <SelectItem value={LogType.Account}>账号管理日志</SelectItem>
@@ -144,7 +144,7 @@ function LogsContent() {
           </Select>
           {isCallLog ? (
             <Select value={status} onValueChange={setStatus}>
-              <SelectTrigger className="h-10 w-[120px] rounded-xl border-stone-200 bg-white"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-10 w-full rounded-xl border-stone-200 bg-white"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value={LogStatus.All}>全部状态</SelectItem>
                 <SelectItem value={LogStatus.Success}>成功</SelectItem>
@@ -156,13 +156,13 @@ function LogsContent() {
             value={userQuery}
             onChange={(event) => setUserQuery(event.target.value)}
             placeholder="用户邮箱/昵称/ID"
-            className="h-10 w-52 rounded-xl border-stone-200 bg-white"
+            className="h-10 w-full rounded-xl border-stone-200 bg-white"
           />
           <DateRangeFilter startDate={startDate} endDate={endDate} onChange={(start, end) => { setStartDate(start); setEndDate(end); }} />
-          <Button variant="outline" onClick={clearFilters} className="h-10 rounded-xl border-stone-200 bg-white px-4 text-stone-700">
+          <Button variant="outline" onClick={clearFilters} className="h-10 justify-center rounded-xl border-stone-200 bg-white px-4 text-stone-700">
             清除筛选条件
           </Button>
-          <Button onClick={() => void loadLogs()} disabled={isLoading} className="h-10 rounded-xl bg-stone-950 px-4 text-white hover:bg-stone-800">
+          <Button onClick={() => void loadLogs()} disabled={isLoading} className="h-10 justify-center rounded-xl bg-stone-950 px-4 text-white hover:bg-stone-800">
             {isLoading ? <LoaderCircle className="size-4 animate-spin" /> : <Search className="size-4" />}
             查询
           </Button>
@@ -171,9 +171,9 @@ function LogsContent() {
 
       <Card className="overflow-hidden rounded-lg border-white/80 bg-white/80 shadow-sm">
         <CardContent className="p-0">
-          <div className="flex items-center justify-between border-b border-stone-100 px-5 py-4 text-sm text-stone-600">
+          <div className="flex flex-col gap-2 border-b border-stone-100 px-5 py-4 text-sm text-stone-600 sm:flex-row sm:items-center sm:justify-between">
             <span>共 {total} 条</span>
-            <Button variant="ghost" className="h-8 rounded-lg px-3 text-stone-500" onClick={() => void loadLogs()} disabled={isLoading}>
+            <Button variant="ghost" className="h-10 justify-center rounded-lg px-3 text-stone-500 sm:h-8 sm:justify-start" onClick={() => void loadLogs()} disabled={isLoading}>
               <RefreshCw className={`size-4 ${isLoading ? "animate-spin" : ""}`} />
               刷新
             </Button>
@@ -216,14 +216,16 @@ function LogsContent() {
               </TableBody>
             </Table>
           </div>
-          <div className="flex items-center justify-end gap-2 border-t border-stone-100 px-4 py-3 text-sm text-stone-500">
-            <span>第 {safePage} / {pageCount} 页，共 {total} 条</span>
-            <Button variant="outline" size="icon" className="size-9 rounded-lg border-stone-200 bg-white" disabled={safePage <= 1} onClick={() => void loadLogs(Math.max(1, safePage - 1))}>
-              <ChevronLeft className="size-4" />
-            </Button>
-            <Button variant="outline" size="icon" className="size-9 rounded-lg border-stone-200 bg-white" disabled={safePage >= pageCount} onClick={() => void loadLogs(Math.min(pageCount, safePage + 1))}>
-              <ChevronRight className="size-4" />
-            </Button>
+          <div className="flex flex-col gap-2 border-t border-stone-100 px-4 py-3 text-sm text-stone-500 sm:flex-row sm:items-center sm:justify-end">
+            <span className="text-center sm:text-left">第 {safePage} / {pageCount} 页，共 {total} 条</span>
+            <div className="flex items-center justify-center gap-2">
+              <Button variant="outline" size="icon" className="size-10 rounded-lg border-stone-200 bg-white sm:size-9" disabled={safePage <= 1} onClick={() => void loadLogs(Math.max(1, safePage - 1))}>
+                <ChevronLeft className="size-4" />
+              </Button>
+              <Button variant="outline" size="icon" className="size-10 rounded-lg border-stone-200 bg-white sm:size-9" disabled={safePage >= pageCount} onClick={() => void loadLogs(Math.min(pageCount, safePage + 1))}>
+                <ChevronRight className="size-4" />
+              </Button>
+            </div>
           </div>
           {!isLoading && items.length === 0 ? <div className="px-6 py-14 text-center text-sm text-stone-500">没有找到日志</div> : null}
         </CardContent>

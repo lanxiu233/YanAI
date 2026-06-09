@@ -62,7 +62,7 @@ export function ImportBrowserDialog() {
 
   return (
     <Dialog open={browserOpen} onOpenChange={setBrowserOpen}>
-      <DialogContent showCloseButton={false} className="max-h-[90vh] max-w-5xl rounded-2xl p-6">
+      <DialogContent showCloseButton={false} className="flex max-h-[90vh] w-[min(94vw,64rem)] max-w-none flex-col overflow-hidden rounded-2xl p-4 sm:p-6">
         <DialogHeader className="gap-2">
           <DialogTitle>选择要导入的账号</DialogTitle>
           <DialogDescription className="text-sm leading-6">
@@ -71,18 +71,18 @@ export function ImportBrowserDialog() {
         </DialogHeader>
 
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="relative min-w-[260px]">
+          <div className="relative w-full lg:w-[260px]">
             <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-stone-400" />
             <Input
               value={fileQuery}
               onChange={(event) => setFileQuery(event.target.value)}
               placeholder="搜索 email 或文件名"
-              className="h-10 rounded-xl border-stone-200 bg-white pl-10"
+              className="h-10 w-full rounded-xl border-stone-200 bg-white pl-10"
             />
           </div>
-          <div className="flex items-center gap-2">
+          <div className="grid w-full gap-2 sm:grid-cols-[120px_minmax(0,1fr)] lg:w-auto lg:grid-cols-[120px_auto]">
             <Select value={pageSize} onValueChange={(value) => setPageSize(value as (typeof PAGE_SIZE_OPTIONS)[number])}>
-              <SelectTrigger className="h-10 w-[120px] rounded-xl border-stone-200 bg-white">
+              <SelectTrigger className="h-10 w-full rounded-xl border-stone-200 bg-white">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -95,7 +95,7 @@ export function ImportBrowserDialog() {
             </Select>
             <Button
               variant="outline"
-              className="h-10 rounded-xl border-stone-200 bg-white px-4 text-stone-700"
+              className="h-10 justify-center rounded-xl border-stone-200 bg-white px-4 text-stone-700"
               onClick={() => toggleSelectAllFiltered(!allFilteredSelected)}
             >
               {allFilteredSelected ? "取消全选" : "全选筛选结果"}
@@ -104,7 +104,7 @@ export function ImportBrowserDialog() {
         </div>
 
         <div className="rounded-xl border border-stone-200">
-          <div className="flex items-center justify-between border-b border-stone-100 px-4 py-3 text-sm text-stone-500">
+          <div className="flex flex-col gap-2 border-b border-stone-100 px-4 py-3 text-sm text-stone-500 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3">
               <Checkbox checked={allFilteredSelected} onCheckedChange={(checked) => toggleSelectAllFiltered(Boolean(checked))} />
               <span>筛选结果 {filteredFiles.length} 个</span>
@@ -133,12 +133,12 @@ export function ImportBrowserDialog() {
           </div>
         </div>
 
-        <div className="flex items-center justify-between text-sm text-stone-500">
-          <span>
+        <div className="flex flex-col gap-2 text-sm text-stone-500 sm:flex-row sm:items-center sm:justify-between">
+          <span className="text-center sm:text-left">
             第 {filteredFiles.length === 0 ? 0 : (safeFilePage - 1) * currentPageSize + 1} -{" "}
             {Math.min(safeFilePage * currentPageSize, filteredFiles.length)} 条，共 {filteredFiles.length} 条
           </span>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center justify-center gap-2">
             <Button
               variant="outline"
               className="h-9 rounded-xl border-stone-200 bg-white px-3"
@@ -161,17 +161,17 @@ export function ImportBrowserDialog() {
           </div>
         </div>
 
-        <DialogFooter className="pt-2">
+        <DialogFooter className="grid gap-2 pt-2 sm:flex sm:justify-end">
           <Button
             variant="secondary"
-            className="h-10 rounded-xl bg-stone-100 px-5 text-stone-700 hover:bg-stone-200"
+            className="h-10 w-full rounded-xl bg-stone-100 px-5 text-stone-700 hover:bg-stone-200 sm:w-auto"
             onClick={() => setBrowserOpen(false)}
             disabled={isStartingImport}
           >
             取消
           </Button>
           <Button
-            className="h-10 rounded-xl bg-stone-950 px-5 text-white hover:bg-stone-800"
+            className="h-10 w-full rounded-xl bg-stone-950 px-5 text-white hover:bg-stone-800 sm:w-auto"
             onClick={() => void startImport()}
             disabled={isStartingImport || selectedNames.length === 0}
           >

@@ -510,10 +510,10 @@ function AccountsPageContent() {
           <h1 className="text-2xl font-semibold tracking-tight">号池管理</h1>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="grid w-full gap-2 sm:grid-cols-2 lg:w-auto lg:grid-cols-none lg:flex lg:flex-wrap lg:items-center lg:justify-end">
           <Button
             variant="outline"
-            className="h-10 rounded-xl border-stone-200 bg-white/80 px-4 text-stone-700 hover:bg-white"
+            className="h-10 w-full justify-center rounded-xl border-stone-200 bg-white/80 px-4 text-stone-700 hover:bg-white lg:w-auto"
             onClick={() => void loadAccounts()}
             disabled={isLoading || isRefreshing || isDeleting}
           >
@@ -522,7 +522,7 @@ function AccountsPageContent() {
           </Button>
           <Button
             variant="outline"
-            className="h-10 rounded-xl border-stone-200 bg-white/80 px-4 text-stone-700 hover:bg-white"
+            className="h-10 w-full justify-center rounded-xl border-stone-200 bg-white/80 px-4 text-stone-700 hover:bg-white lg:w-auto"
             onClick={() => void handleRefreshAccounts(accounts.map((item) => item.access_token))}
             disabled={isLoading || isRefreshing || isDeleting || accounts.length === 0}
           >
@@ -531,6 +531,7 @@ function AccountsPageContent() {
           </Button>
           <AccountImportDialog
             disabled={isLoading || isRefreshing || isDeleting}
+            triggerClassName="w-full justify-center lg:w-auto"
             onImported={(items) => {
               setAccounts(normalizeAccounts(items));
               setSelectedIds([]);
@@ -539,7 +540,7 @@ function AccountsPageContent() {
           />
           <Button
             variant="outline"
-            className="h-10 rounded-xl border-stone-200 bg-white/80 px-4 text-stone-700 hover:bg-white"
+            className="h-10 w-full justify-center rounded-xl border-stone-200 bg-white/80 px-4 text-stone-700 hover:bg-white lg:w-auto"
             onClick={() => downloadTokens(accounts)}
             disabled={accounts.length === 0}
           >
@@ -765,7 +766,7 @@ function AccountsPageContent() {
           </div>
 
           <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
-            <div className="relative min-w-[260px]">
+            <div className="relative w-full lg:w-[260px]">
               <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-stone-400" />
               <Input
                 value={query}
@@ -774,7 +775,7 @@ function AccountsPageContent() {
                   setPage(1);
                 }}
                 placeholder="搜索邮箱"
-                className="h-10 rounded-xl border-stone-200 bg-white/85 pl-10"
+                className="h-10 w-full rounded-xl border-stone-200 bg-white/85 pl-10"
               />
             </div>
             <Select
@@ -838,10 +839,10 @@ function AccountsPageContent() {
         >
           <CardContent className="space-y-0 p-0">
             <div className="flex flex-col gap-3 border-b border-stone-100 px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
-              <div className="flex flex-wrap items-center gap-2 text-sm text-stone-500">
+              <div className="grid gap-2 text-sm text-stone-500 sm:grid-cols-2 lg:flex lg:flex-wrap lg:items-center">
                 <Button
                   variant="ghost"
-                  className="h-8 rounded-lg px-3 text-stone-500 hover:bg-stone-100"
+                  className="h-10 justify-center rounded-lg px-3 text-stone-500 hover:bg-stone-100 sm:h-9 lg:h-8"
                   onClick={() => void handleRefreshAccounts(selectedTokens)}
                   disabled={selectedTokens.length === 0 || isRefreshing}
                 >
@@ -850,7 +851,7 @@ function AccountsPageContent() {
                 </Button>
                 <Button
                   variant="ghost"
-                  className="h-8 rounded-lg px-3 text-stone-500 hover:bg-stone-100"
+                  className="h-10 justify-center rounded-lg px-3 text-stone-500 hover:bg-stone-100 sm:h-9 lg:h-8"
                   onClick={() => void handleExportSelectedAccounts()}
                   disabled={selectedTokens.length === 0 || isExportingSelected}
                 >
@@ -859,7 +860,7 @@ function AccountsPageContent() {
                 </Button>
                 <Button
                   variant="ghost"
-                  className="h-8 rounded-lg px-3 text-rose-500 hover:bg-rose-50 hover:text-rose-600"
+                  className="h-10 justify-center rounded-lg px-3 text-rose-500 hover:bg-rose-50 hover:text-rose-600 sm:h-9 lg:h-8"
                   onClick={() => void handleDeleteTokens(abnormalTokens)}
                   disabled={abnormalTokens.length === 0 || isDeleting}
                 >
@@ -868,7 +869,7 @@ function AccountsPageContent() {
                 </Button>
                 <Button
                   variant="ghost"
-                  className="h-8 rounded-lg px-3 text-rose-500 hover:bg-rose-50 hover:text-rose-600"
+                  className="h-10 justify-center rounded-lg px-3 text-rose-500 hover:bg-rose-50 hover:text-rose-600 sm:h-9 lg:h-8"
                   onClick={() => void handleDeleteTokens(selectedTokens)}
                   disabled={selectedTokens.length === 0 || isDeleting}
                 >
@@ -876,7 +877,7 @@ function AccountsPageContent() {
                   删除所选
                 </Button>
                 {selectedIds.length > 0 ? (
-                  <span className="rounded-lg bg-stone-100 px-2.5 py-1 text-xs font-medium text-stone-600">
+                  <span className="rounded-lg bg-stone-100 px-2.5 py-1 text-center text-xs font-medium text-stone-600 sm:col-span-2 lg:col-span-1">
                     已选择 {selectedIds.length} 项
                   </span>
                 ) : null}
@@ -1026,72 +1027,77 @@ function AccountsPageContent() {
             </div>
 
             <div className="border-t border-stone-100 px-4 py-4">
-              <div className="flex items-center justify-center gap-3 overflow-x-auto whitespace-nowrap">
-                <div className="shrink-0 text-sm text-stone-500">
-                显示第 {filteredAccounts.length === 0 ? 0 : startIndex + 1} -{" "}
-                {Math.min(startIndex + Number(pageSize), filteredAccounts.length)} 条，共{" "}
-                {filteredAccounts.length} 条
+              <div className="flex flex-col gap-3 text-sm text-stone-500 lg:flex-row lg:items-center lg:justify-center lg:whitespace-nowrap">
+                <div className="text-center lg:shrink-0 lg:text-left">
+                  显示第 {filteredAccounts.length === 0 ? 0 : startIndex + 1} -{" "}
+                  {Math.min(startIndex + Number(pageSize), filteredAccounts.length)} 条，共{" "}
+                  {filteredAccounts.length} 条
                 </div>
 
-                <span className="shrink-0 text-sm leading-none text-stone-500">
-                  {safePage} / {pageCount} 页
-                </span>
-                <Select
-                  value={pageSize}
-                  onValueChange={(value) => {
-                    setPageSize(value);
-                    setPage(1);
-                  }}
-                >
-                  <SelectTrigger className="h-10 w-[108px] shrink-0 rounded-lg border-stone-200 bg-white text-sm leading-none">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="10">10 / 页</SelectItem>
-                    <SelectItem value="20">20 / 页</SelectItem>
-                    <SelectItem value="50">50 / 页</SelectItem>
-                    <SelectItem value="100">100 / 页</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="size-10 shrink-0 rounded-lg border-stone-200 bg-white"
-                  disabled={safePage <= 1}
-                  onClick={() => setPage((prev) => Math.max(1, prev - 1))}
-                >
-                  <ChevronLeft className="size-4" />
-                </Button>
-                {paginationItems.map((item, index) =>
-                  item === "..." ? (
-                    <span key={`ellipsis-${index}`} className="px-1 text-sm text-stone-400">
-                      ...
-                    </span>
-                  ) : (
-                    <Button
-                      key={item}
-                      variant={item === safePage ? "default" : "outline"}
-                      className={cn(
-                        "h-10 min-w-10 shrink-0 rounded-lg px-3",
-                        item === safePage
-                          ? "bg-stone-950 text-white hover:bg-stone-800"
-                          : "border-stone-200 bg-white text-stone-700",
-                      )}
-                      onClick={() => setPage(item)}
-                    >
-                      {item}
-                    </Button>
-                  ),
-                )}
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="size-10 shrink-0 rounded-lg border-stone-200 bg-white"
-                  disabled={safePage >= pageCount}
-                  onClick={() => setPage((prev) => Math.min(pageCount, prev + 1))}
-                >
-                  <ChevronRight className="size-4" />
-                </Button>
+                <div className="flex items-center justify-center gap-2">
+                  <span className="shrink-0 leading-none text-stone-500">
+                    {safePage} / {pageCount} 页
+                  </span>
+                  <Select
+                    value={pageSize}
+                    onValueChange={(value) => {
+                      setPageSize(value);
+                      setPage(1);
+                    }}
+                  >
+                    <SelectTrigger className="h-10 w-[108px] shrink-0 rounded-lg border-stone-200 bg-white text-sm leading-none">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="10">10 / 页</SelectItem>
+                      <SelectItem value="20">20 / 页</SelectItem>
+                      <SelectItem value="50">50 / 页</SelectItem>
+                      <SelectItem value="100">100 / 页</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="flex items-center gap-2 overflow-x-auto whitespace-nowrap pb-1 lg:pb-0">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="size-10 shrink-0 rounded-lg border-stone-200 bg-white"
+                    disabled={safePage <= 1}
+                    onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+                  >
+                    <ChevronLeft className="size-4" />
+                  </Button>
+                  {paginationItems.map((item, index) =>
+                    item === "..." ? (
+                      <span key={`ellipsis-${index}`} className="shrink-0 px-1 text-sm text-stone-400">
+                        ...
+                      </span>
+                    ) : (
+                      <Button
+                        key={item}
+                        variant={item === safePage ? "default" : "outline"}
+                        className={cn(
+                          "h-10 min-w-10 shrink-0 rounded-lg px-3",
+                          item === safePage
+                            ? "bg-stone-950 text-white hover:bg-stone-800"
+                            : "border-stone-200 bg-white text-stone-700",
+                        )}
+                        onClick={() => setPage(item)}
+                      >
+                        {item}
+                      </Button>
+                    ),
+                  )}
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="size-10 shrink-0 rounded-lg border-stone-200 bg-white"
+                    disabled={safePage >= pageCount}
+                    onClick={() => setPage((prev) => Math.min(pageCount, prev + 1))}
+                  >
+                    <ChevronRight className="size-4" />
+                  </Button>
+                </div>
               </div>
             </div>
           </CardContent>

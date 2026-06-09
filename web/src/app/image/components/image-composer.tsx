@@ -981,7 +981,7 @@ export function ImageComposer({
   };
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
+    <div className="flex flex-col lg:h-full lg:min-h-0">
       <div className="border-b border-rose-100/70 px-4 py-4">
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -994,7 +994,7 @@ export function ImageComposer({
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+      <div className="px-4 py-4 lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
         {mode === "edit" && (
           <input
             ref={fileInputRef}
@@ -1072,7 +1072,7 @@ export function ImageComposer({
         ) : null}
 
         <div className="mb-3 space-y-2 px-1">
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             {quickPromptItems.map((item, index) => {
               const active = item.id === activePresetId;
               const favorite = favoritePromptIdSet.has(getPromptIdentityKey(item));
@@ -1118,7 +1118,7 @@ export function ImageComposer({
                       }
                     }}
                     className={cn(
-                      "inline-flex size-8 shrink-0 items-center justify-center rounded-full transition",
+                      "inline-flex size-10 shrink-0 items-center justify-center rounded-full transition lg:size-8",
                       favorite
                         ? "bg-amber-100 text-amber-600"
                         : active
@@ -1133,7 +1133,7 @@ export function ImageComposer({
               );
             })}
           </div>
-          <div className="flex flex-wrap justify-end gap-2">
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-end">
             <button
               type="button"
               onClick={() => void handleCopyPrompt()}
@@ -1368,7 +1368,7 @@ export function ImageComposer({
                   void onSubmit();
                 }
               }}
-              className="min-h-[220px] resize-y rounded-lg border-0 bg-transparent px-4 pt-4 pb-4 text-[15px] leading-7 text-stone-900 shadow-none placeholder:text-stone-400 focus-visible:ring-0"
+              className="min-h-[180px] resize-y rounded-lg border-0 bg-transparent px-4 pt-4 pb-4 text-[15px] leading-7 text-stone-900 shadow-none placeholder:text-stone-400 focus-visible:ring-0 sm:min-h-[220px]"
             />
 
             <div className="border-t border-rose-100 bg-white/80 px-3 py-3">
@@ -1385,16 +1385,16 @@ export function ImageComposer({
                       <span>{referenceImages.length > 0 ? "继续添加参考图" : "上传参考图"}</span>
                     </Button>
                   )}
-                  <div className="inline-flex h-9 items-center justify-center rounded-lg bg-rose-50 px-3 text-xs font-medium text-stone-600">
+                  <div className="inline-flex h-10 items-center justify-center rounded-lg bg-rose-50 px-3 text-xs font-medium text-stone-600 lg:h-9">
                     <span className="mr-1">额度</span>{availableQuota}
                   </div>
                   {activeTaskCount > 0 && (
-                    <div className="col-span-2 flex h-9 items-center justify-center gap-1.5 rounded-lg bg-amber-50 px-3 text-xs font-medium text-amber-700">
+                    <div className="col-span-2 flex h-10 items-center justify-center gap-1.5 rounded-lg bg-amber-50 px-3 text-xs font-medium text-amber-700 lg:h-9">
                       <LoaderCircle className="size-3 animate-spin" />
                       {activeTaskCount}<span> 个任务处理中</span>
                     </div>
                   )}
-                  <div className="flex h-9 items-center justify-center gap-2 rounded-lg border border-rose-100 bg-white/85 px-3">
+                  <div className="flex h-10 items-center justify-center gap-2 rounded-lg border border-rose-100 bg-white/85 px-3 lg:h-9">
                     <span className="text-sm font-medium text-stone-700">张数</span>
                     <Input
                       type="number"
@@ -1403,17 +1403,17 @@ export function ImageComposer({
                       step="1"
                       value={imageCount}
                       onChange={(event) => onImageCountChange(event.target.value)}
-                      className="h-7 w-[44px] border-0 bg-transparent px-0 text-center text-sm font-medium text-stone-700 shadow-none focus-visible:ring-0"
+                      className="h-10 w-[48px] border-0 bg-transparent px-0 text-center text-sm font-medium text-stone-700 shadow-none focus-visible:ring-0 lg:h-7 lg:w-[44px]"
                     />
                   </div>
                   <div
                     ref={sizeMenuRef}
-                    className="relative col-span-2 flex h-9 items-center gap-2 rounded-lg border border-rose-100 bg-white/85 px-3 text-sm"
+                    className="relative col-span-2 flex h-10 items-center gap-2 rounded-lg border border-rose-100 bg-white/85 px-3 text-sm lg:h-9"
                   >
                     <span className="font-medium text-stone-700">比例</span>
                     <button
                       type="button"
-                      className="flex h-7 min-w-0 flex-1 items-center justify-between bg-transparent text-left text-sm font-bold text-stone-700"
+                      className="flex h-10 min-w-0 flex-1 items-center justify-between bg-transparent text-left text-sm font-bold text-stone-700 lg:h-7"
                       onClick={() => setIsSizeMenuOpen((open) => !open)}
                     >
                       <span className="truncate">{imageSizeLabel}</span>

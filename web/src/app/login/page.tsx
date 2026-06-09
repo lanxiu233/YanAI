@@ -78,17 +78,17 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="relative isolate grid min-h-[100dvh] w-full place-items-center overflow-hidden px-4 py-6 sm:py-8">
+    <div className="relative isolate grid min-h-[100dvh] w-full place-items-center overflow-x-hidden px-4 py-6 sm:py-8">
       <div className="absolute inset-0 -z-20 bg-[radial-gradient(circle_at_15%_12%,rgba(243,111,159,0.18),transparent_30%),radial-gradient(circle_at_85%_22%,rgba(202,164,232,0.16),transparent_28%),linear-gradient(135deg,#fff8fb_0%,#f7eef2_48%,#f6f1ea_100%)]" />
       <div className="yan-soft-grid absolute inset-0 -z-10 opacity-60" />
 
       <div className="grid w-full max-w-5xl overflow-hidden rounded-[28px] border border-white/75 bg-white/80 shadow-[0_28px_90px_rgba(84,38,62,0.12)] backdrop-blur-xl lg:grid-cols-[400px_minmax(0,1fr)]">
-        <section className="relative hidden min-h-[600px] overflow-hidden border-r border-white/45 bg-[#2d1d26] p-8 text-white lg:flex lg:flex-col lg:justify-between">
+        <section className="relative flex min-h-[430px] flex-col justify-between overflow-hidden border-b border-white/45 bg-[#2d1d26] p-5 text-white sm:min-h-[520px] sm:p-6 lg:min-h-[600px] lg:border-b-0 lg:border-r lg:p-8">
           <div className="absolute -right-24 -top-20 h-56 w-56 rounded-full bg-rose-400/24 blur-3xl" />
           <div className="absolute bottom-6 left-8 h-44 w-44 rounded-full bg-[#d5aa61]/14 blur-3xl" />
           <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.08),transparent_38%)]" />
 
-          <div className="relative z-10 flex items-center justify-between">
+          <div className="relative z-10 flex flex-wrap items-center justify-between gap-2">
             <div className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/10 px-3 py-1 text-xs font-medium text-white/74">
               <Sparkles className="size-3.5" />
               画图工作台
@@ -99,8 +99,8 @@ export default function LoginPage() {
             </div>
           </div>
 
-          <div className="relative z-10 mt-8 rounded-[30px] border border-white/12 bg-white/[0.08] p-4 shadow-[0_24px_80px_rgba(0,0,0,0.22)]">
-            <div className="rounded-[24px] border border-white/65 bg-[#fbf6f8] p-4 text-[#2d1d26] shadow-[0_18px_42px_rgba(0,0,0,0.14)]">
+          <div className="relative z-10 mt-5 rounded-[26px] border border-white/12 bg-white/[0.08] p-3 shadow-[0_24px_80px_rgba(0,0,0,0.22)] sm:mt-6 sm:p-4 lg:mt-8 lg:rounded-[30px]">
+            <div className="rounded-[22px] border border-white/65 bg-[#fbf6f8] p-3 text-[#2d1d26] shadow-[0_18px_42px_rgba(0,0,0,0.14)] sm:p-4 lg:rounded-[24px]">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
                   <span className="size-2.5 rounded-full bg-rose-300" />
@@ -112,7 +112,7 @@ export default function LoginPage() {
                 </div>
               </div>
 
-              <div className="mt-5 rounded-2xl border border-rose-100 bg-white p-3">
+              <div className="mt-4 rounded-2xl border border-rose-100 bg-white p-3 sm:mt-5">
                 <div className="mb-2 flex items-center gap-2 text-xs font-medium text-rose-600">
                   <Sparkles className="size-3.5" />
                   提示词草稿
@@ -125,7 +125,7 @@ export default function LoginPage() {
               </div>
 
               <div className="mt-3 grid grid-cols-[1.15fr_0.85fr] gap-3">
-                <div className="relative min-h-48 overflow-hidden rounded-2xl bg-[radial-gradient(circle_at_34%_22%,rgba(255,255,255,0.9),transparent_28%),linear-gradient(135deg,#fee2e2_0%,#fb7185_45%,#2d1d26_100%)]">
+                <div className="relative min-h-36 overflow-hidden rounded-2xl bg-[radial-gradient(circle_at_34%_22%,rgba(255,255,255,0.9),transparent_28%),linear-gradient(135deg,#fee2e2_0%,#fb7185_45%,#2d1d26_100%)] sm:min-h-48">
                   <div className="absolute bottom-3 left-3 right-3 rounded-xl border border-white/25 bg-black/24 p-3 backdrop-blur-md">
                     <div className="h-2 w-16 rounded-full bg-white/75" />
                     <div className="mt-2 h-2 w-24 rounded-full bg-white/38" />
@@ -146,13 +146,13 @@ export default function LoginPage() {
               </div>
             </div>
 
-            <div className="mt-3 grid grid-cols-3 gap-2 text-xs text-white/70">
+            <div className="mt-3 grid grid-cols-3 gap-2 text-[11px] text-white/70 sm:text-xs">
               {[
                 ["队列", "自动续跑"],
                 ["作品", "归档同步"],
                 ["提示词", "收藏复用"],
               ].map(([title, label]) => (
-                <div key={title} className="rounded-2xl border border-white/10 bg-white/[0.08] px-3 py-2.5">
+                <div key={title} className="rounded-2xl border border-white/10 bg-white/[0.08] px-2.5 py-2 sm:px-3 sm:py-2.5">
                   <div className="font-medium text-white">{title}</div>
                   <div className="mt-1 text-[11px] text-white/48">{label}</div>
                 </div>
@@ -169,7 +169,7 @@ export default function LoginPage() {
         </section>
 
         <Card className="border-0 bg-white/90 shadow-none">
-          <CardContent className="mx-auto flex min-h-[600px] w-full max-w-[440px] flex-col justify-center space-y-6 p-6 sm:p-10">
+          <CardContent className="mx-auto flex w-full max-w-[440px] flex-col justify-center space-y-6 p-6 sm:min-h-[600px] sm:p-10">
             <div className="flex items-center gap-3 lg:hidden">
               <span className="yan-mark-gradient grid size-10 place-items-center rounded-xl text-sm font-black text-white shadow-[0_14px_30px_rgba(243,111,159,0.22)]">
                 颜

@@ -445,20 +445,20 @@ function PromptManagerContent({ session }: { session: StoredAuthSession }) {
             {isAdmin ? "审核用户提交的提示词，维护公共提示词库。" : "创建、分享和提交自己的提示词，审核通过后会进入公共库。"}
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="grid w-full gap-2 sm:grid-cols-3 lg:w-auto">
           <Button
             variant="outline"
             onClick={() => setShareDialogOpen(true)}
-            className="h-10 rounded-xl border-stone-200 bg-white px-4 text-stone-700"
+            className="h-10 justify-center rounded-xl border-stone-200 bg-white px-4 text-stone-700"
           >
             <Upload className="size-4" />
             导入分享
           </Button>
-          <Button variant="outline" onClick={() => void loadPrompts()} disabled={isLoading} className="h-10 rounded-xl border-stone-200 bg-white px-4 text-stone-700">
+          <Button variant="outline" onClick={() => void loadPrompts()} disabled={isLoading} className="h-10 justify-center rounded-xl border-stone-200 bg-white px-4 text-stone-700">
             <RefreshCw className={cn("size-4", isLoading && "animate-spin")} />
             刷新
           </Button>
-          <Button onClick={openCreateDialog} className="h-10 rounded-xl bg-stone-950 px-4 text-white hover:bg-stone-800">
+          <Button onClick={openCreateDialog} className="h-10 justify-center rounded-xl bg-stone-950 px-4 text-white hover:bg-stone-800">
             <Plus className="size-4" />
             {isAdmin ? "添加公共提示词" : "添加提示词"}
           </Button>
@@ -559,12 +559,12 @@ function PromptManagerContent({ session }: { session: StoredAuthSession }) {
                       </p>
                     ) : null}
                   </div>
-                  <div className="mt-auto flex items-center justify-between gap-2">
+                  <div className="mt-auto flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div className="min-w-0 truncate text-xs text-stone-400">
                       {item.owner_name ? `${item.owner_name} · ` : ""}
                       {item.author || "未署名"}
                     </div>
-                    <div className="flex shrink-0 items-center gap-1">
+                    <div className="flex flex-wrap items-center gap-1 sm:shrink-0 sm:flex-nowrap">
                       <Button variant="ghost" size="icon" className="size-8 rounded-lg text-stone-500 hover:bg-stone-100" onClick={() => void copyPrompt(item)} aria-label="复制提示词" title="复制提示词">
                         <Copy className="size-4" />
                       </Button>
@@ -653,8 +653,8 @@ function PromptManagerContent({ session }: { session: StoredAuthSession }) {
               </div>
             ) : null}
           </div>
-          <div className="flex justify-end gap-2 border-t border-stone-200 px-5 py-4 sm:px-6">
-            <Button type="button" variant="outline" onClick={() => setShareDialogOpen(false)} className="h-10 rounded-xl border-stone-200 bg-white px-4">
+          <div className="grid gap-2 border-t border-stone-200 px-5 py-4 sm:flex sm:justify-end sm:px-6">
+            <Button type="button" variant="outline" onClick={() => setShareDialogOpen(false)} className="h-10 w-full rounded-xl border-stone-200 bg-white px-4 sm:w-auto">
               取消
             </Button>
             <Button
@@ -662,7 +662,7 @@ function PromptManagerContent({ session }: { session: StoredAuthSession }) {
               variant="outline"
               onClick={() => void loadSharePreview(shareInput)}
               disabled={isImportingShare || !shareInput.trim()}
-              className="h-10 rounded-xl border-stone-200 bg-white px-4"
+              className="h-10 w-full rounded-xl border-stone-200 bg-white px-4 sm:w-auto"
             >
               {isImportingShare ? <LoaderCircle className="size-4 animate-spin" /> : <Search className="size-4" />}
               预览
@@ -671,7 +671,7 @@ function PromptManagerContent({ session }: { session: StoredAuthSession }) {
               type="button"
               onClick={() => void handleImportShare()}
               disabled={isImportingShare || !shareInput.trim()}
-              className="h-10 rounded-xl bg-stone-950 px-4 text-white hover:bg-stone-800"
+              className="h-10 w-full rounded-xl bg-stone-950 px-4 text-white hover:bg-stone-800 sm:w-auto"
             >
               {isImportingShare ? <LoaderCircle className="size-4 animate-spin" /> : null}
               导入
@@ -791,11 +791,11 @@ function PromptManagerContent({ session }: { session: StoredAuthSession }) {
               </div>
             </div>
           </div>
-          <div className="flex justify-end gap-2 border-t border-stone-200 px-5 py-4 sm:px-6">
-            <Button type="button" variant="outline" onClick={() => setDialogOpen(false)} className="h-10 rounded-xl border-stone-200 bg-white px-4">
+          <div className="grid gap-2 border-t border-stone-200 px-5 py-4 sm:flex sm:justify-end sm:px-6">
+            <Button type="button" variant="outline" onClick={() => setDialogOpen(false)} className="h-10 w-full rounded-xl border-stone-200 bg-white px-4 sm:w-auto">
               取消
             </Button>
-            <Button type="button" onClick={() => void handleSubmit()} disabled={isSaving} className="h-10 rounded-xl bg-stone-950 px-4 text-white hover:bg-stone-800">
+            <Button type="button" onClick={() => void handleSubmit()} disabled={isSaving} className="h-10 w-full rounded-xl bg-stone-950 px-4 text-white hover:bg-stone-800 sm:w-auto">
               {isSaving ? <LoaderCircle className="size-4 animate-spin" /> : null}
               保存
             </Button>

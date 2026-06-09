@@ -137,9 +137,9 @@ export function UserKeysCard() {
   return (
     <>
       <Card className="rounded-lg border-white/80 bg-white/80 shadow-sm">
-        <CardContent className="space-y-6 p-6">
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex items-center gap-3">
+        <CardContent className="space-y-6 p-4 sm:p-6">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex min-w-0 items-start gap-3">
               <div className="flex size-10 items-center justify-center rounded-xl bg-stone-100">
                 <KeyRound className="size-5 text-stone-600" />
               </div>
@@ -148,7 +148,7 @@ export function UserKeysCard() {
                 <p className="text-sm text-stone-500">为普通用户创建专用密钥；普通用户只能进入画图页，不能查看设置和号池。</p>
               </div>
             </div>
-            <Button className="h-9 rounded-xl bg-stone-950 px-4 text-white hover:bg-stone-800" onClick={() => setIsDialogOpen(true)}>
+            <Button className="h-10 w-full justify-center rounded-xl bg-stone-950 px-4 text-white hover:bg-stone-800 sm:h-9 sm:w-auto" onClick={() => setIsDialogOpen(true)}>
               <Plus className="size-4" />
               创建用户密钥
             </Button>
@@ -162,7 +162,7 @@ export function UserKeysCard() {
                 <Button
                   type="button"
                   variant="outline"
-                  className="h-9 rounded-xl border-emerald-200 bg-white px-4 text-emerald-700"
+                  className="h-10 w-full justify-center rounded-xl border-emerald-200 bg-white px-4 text-emerald-700 md:h-9 md:w-auto"
                   onClick={() => void handleCopy(revealedKey)}
                 >
                   <Copy className="size-4" />
@@ -199,11 +199,11 @@ export function UserKeysCard() {
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="grid gap-2 sm:grid-cols-2 md:flex md:items-center">
                       <Button
                         type="button"
                         variant="outline"
-                        className="h-9 rounded-xl border-stone-200 bg-white px-4 text-stone-700"
+                        className="h-10 w-full justify-center rounded-xl border-stone-200 bg-white px-4 text-stone-700 md:h-9 md:w-auto"
                         onClick={() => void handleToggle(item)}
                         disabled={isPending}
                       >
@@ -219,7 +219,7 @@ export function UserKeysCard() {
                       <Button
                         type="button"
                         variant="outline"
-                        className="h-9 rounded-xl border-rose-200 bg-white px-4 text-rose-600 hover:bg-rose-50 hover:text-rose-700"
+                        className="h-10 w-full justify-center rounded-xl border-rose-200 bg-white px-4 text-rose-600 hover:bg-rose-50 hover:text-rose-700 md:h-9 md:w-auto"
                         onClick={() => setDeletingItem(item)}
                         disabled={isPending}
                       >
@@ -236,7 +236,7 @@ export function UserKeysCard() {
       </Card>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="rounded-2xl p-6">
+        <DialogContent className="w-[min(94vw,32rem)] rounded-2xl p-4 sm:p-6">
           <DialogHeader className="gap-2">
             <DialogTitle>创建用户密钥</DialogTitle>
             <DialogDescription className="text-sm leading-6">
@@ -252,11 +252,11 @@ export function UserKeysCard() {
               className="h-11 rounded-xl border-stone-200 bg-white"
             />
           </div>
-          <DialogFooter>
+          <DialogFooter className="grid gap-2 sm:flex sm:justify-end">
             <Button
               type="button"
               variant="secondary"
-              className="h-10 rounded-xl bg-stone-100 px-5 text-stone-700 hover:bg-stone-200"
+              className="h-10 w-full rounded-xl bg-stone-100 px-5 text-stone-700 hover:bg-stone-200 sm:w-auto"
               onClick={() => setIsDialogOpen(false)}
               disabled={isCreating}
             >
@@ -264,7 +264,7 @@ export function UserKeysCard() {
             </Button>
             <Button
               type="button"
-              className="h-10 rounded-xl bg-stone-950 px-5 text-white hover:bg-stone-800"
+              className="h-10 w-full rounded-xl bg-stone-950 px-5 text-white hover:bg-stone-800 sm:w-auto"
               onClick={() => void handleCreate()}
               disabled={isCreating}
             >
@@ -276,18 +276,18 @@ export function UserKeysCard() {
       </Dialog>
 
       <Dialog open={Boolean(deletingItem)} onOpenChange={(open) => (!open ? setDeletingItem(null) : null)}>
-        <DialogContent className="rounded-2xl p-6">
+        <DialogContent className="w-[min(94vw,32rem)] rounded-2xl p-4 sm:p-6">
           <DialogHeader className="gap-2">
             <DialogTitle>删除用户密钥</DialogTitle>
             <DialogDescription className="text-sm leading-6">
               确认删除用户密钥「{deletingItem?.name}」吗？删除后该密钥将无法继续调用接口。
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter>
+          <DialogFooter className="grid gap-2 sm:flex sm:justify-end">
             <Button
               type="button"
               variant="secondary"
-              className="h-10 rounded-xl bg-stone-100 px-5 text-stone-700 hover:bg-stone-200"
+              className="h-10 w-full rounded-xl bg-stone-100 px-5 text-stone-700 hover:bg-stone-200 sm:w-auto"
               onClick={() => setDeletingItem(null)}
               disabled={deletingItem ? pendingIds.has(deletingItem.id) : false}
             >
@@ -295,7 +295,7 @@ export function UserKeysCard() {
             </Button>
             <Button
               type="button"
-              className="h-10 rounded-xl bg-rose-600 px-5 text-white hover:bg-rose-700"
+              className="h-10 w-full rounded-xl bg-rose-600 px-5 text-white hover:bg-rose-700 sm:w-auto"
               onClick={() => void handleDelete()}
               disabled={deletingItem ? pendingIds.has(deletingItem.id) : false}
             >

@@ -168,13 +168,13 @@ function UsersPageContent() {
           <div className="text-xs font-semibold tracking-[0.18em] text-rose-400 uppercase">Users</div>
           <h1 className="text-2xl font-semibold tracking-tight">用户管理</h1>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索邮箱或昵称" className="h-10 w-56 rounded-xl border-rose-100 bg-white" />
-          <Button className="h-10 rounded-xl bg-rose-500 text-white hover:bg-rose-600" onClick={() => void load()}>
+        <div className="grid w-full gap-2 sm:grid-cols-[minmax(180px,1fr)_auto_auto] lg:w-auto">
+          <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索邮箱或昵称" className="h-10 w-full rounded-xl border-rose-100 bg-white" />
+          <Button className="h-10 justify-center rounded-xl bg-rose-500 text-white hover:bg-rose-600" onClick={() => void load()}>
             <Search className="size-4" />
             查询
           </Button>
-          <Button variant="outline" className="h-10 rounded-xl border-rose-100 bg-white" onClick={() => void load()}>
+          <Button variant="outline" className="h-10 justify-center rounded-xl border-rose-100 bg-white" onClick={() => void load()}>
             <RefreshCw className="size-4" />
             刷新
           </Button>
@@ -212,7 +212,7 @@ function UsersPageContent() {
             <Input value={creating.name} onChange={(event) => setCreating((current) => ({ ...current, name: event.target.value }))} placeholder="昵称" className="h-10 rounded-xl border-rose-100 bg-white" />
             <Input type="password" value={creating.password} onChange={(event) => setCreating((current) => ({ ...current, password: event.target.value }))} placeholder="初始密码" className="h-10 rounded-xl border-rose-100 bg-white" />
             <Input type="number" value={creating.quota} onChange={(event) => setCreating((current) => ({ ...current, quota: event.target.value }))} placeholder="额度" className="h-10 rounded-xl border-rose-100 bg-white" />
-            <Button className="h-10 rounded-xl bg-rose-500 text-white hover:bg-rose-600" onClick={() => void handleCreate()}>
+            <Button className="h-10 w-full rounded-xl bg-rose-500 text-white hover:bg-rose-600 md:w-auto" onClick={() => void handleCreate()}>
               创建
             </Button>
           </div>
@@ -221,10 +221,10 @@ function UsersPageContent() {
 
       <Card className="overflow-hidden rounded-lg border-white/80 bg-white/80 shadow-sm">
         <CardContent className="p-0">
-          <div className="flex flex-wrap items-center gap-2 border-b border-rose-50 px-5 py-3">
+          <div className="flex flex-col gap-2 border-b border-rose-50 px-5 py-3 sm:flex-row sm:flex-wrap sm:items-center">
             <Button
               variant="ghost"
-              className="h-8 rounded-lg px-3 text-rose-500 hover:bg-rose-50 hover:text-rose-600"
+              className="h-10 justify-center rounded-lg px-3 text-rose-500 hover:bg-rose-50 hover:text-rose-600 sm:h-8"
               onClick={() => openDeleteUsers(selectedUsers)}
               disabled={selectedUsers.length === 0 || isDeleting}
             >
@@ -237,7 +237,7 @@ function UsersPageContent() {
               </span>
             ) : null}
           </div>
-          <div className="grid grid-cols-[44px_minmax(220px,1.4fr)_120px_120px_120px_150px_300px] border-b border-rose-50 px-5 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-stone-400">
+          <div className="hidden grid-cols-[44px_minmax(220px,1.4fr)_120px_120px_120px_150px_300px] border-b border-rose-50 px-5 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-stone-400 lg:grid">
             <Checkbox
               checked={allSelected}
               onCheckedChange={(checked) => toggleSelectAll(Boolean(checked))}
@@ -258,7 +258,7 @@ function UsersPageContent() {
             <div className="px-6 py-14 text-center text-sm text-stone-500">暂无用户</div>
           ) : (
             items.map((user) => (
-              <div key={user.id} className="grid grid-cols-[44px_minmax(220px,1.4fr)_120px_120px_120px_150px_300px] items-center border-b border-rose-50 px-5 py-4 text-sm last:border-0">
+              <div key={user.id} className="grid gap-3 border-b border-rose-50 px-5 py-4 text-sm last:border-0 lg:grid-cols-[44px_minmax(220px,1.4fr)_120px_120px_120px_150px_300px] lg:items-center">
                 <Checkbox
                   checked={selectedIds.includes(user.id)}
                   onCheckedChange={(checked) => {
@@ -269,37 +269,68 @@ function UsersPageContent() {
                     );
                   }}
                   aria-label={`选择用户 ${user.email}`}
+                  className="hidden lg:inline-flex"
                 />
-                <div className="min-w-0">
-                  <div className="truncate font-medium text-stone-900">{user.name}</div>
-                  <div className="truncate text-xs text-stone-500">{user.email}</div>
+                <div className="flex min-w-0 items-start justify-between gap-3 lg:block">
+                  <label className="flex min-w-0 items-start gap-3 lg:block">
+                    <Checkbox
+                      checked={selectedIds.includes(user.id)}
+                      onCheckedChange={(checked) => {
+                        setSelectedIds((current) =>
+                          checked
+                            ? Array.from(new Set([...current, user.id]))
+                            : current.filter((id) => id !== user.id),
+                        );
+                      }}
+                      aria-label={`选择用户 ${user.email}`}
+                      className="mt-1 lg:hidden"
+                    />
+                    <span className="min-w-0">
+                      <span className="block truncate font-medium text-stone-900">{user.name}</span>
+                      <span className="block truncate text-xs text-stone-500">{user.email}</span>
+                    </span>
+                  </label>
+                  <Badge className="lg:hidden" variant={user.status === "active" ? "success" : "secondary"}>
+                    {user.status === "active" ? "正常" : "禁用"}
+                  </Badge>
                 </div>
-                <Badge variant={user.status === "active" ? "success" : "secondary"}>
+                <Badge className="hidden w-fit lg:inline-flex" variant={user.status === "active" ? "success" : "secondary"}>
                   {user.status === "active" ? "正常" : "禁用"}
                 </Badge>
-                <div className="font-semibold text-rose-600">{user.quota}</div>
-                <div className="text-stone-600">{user.image_count || 0} / {user.spent_quota || user.quota_used || 0}</div>
-                <div className="text-stone-500">{formatTime(user.last_login_at)}</div>
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="grid grid-cols-3 gap-2 lg:contents">
+                  <div>
+                    <div className="text-[11px] text-stone-400 lg:hidden">额度</div>
+                    <div className="font-semibold text-rose-600">{user.quota}</div>
+                  </div>
+                  <div>
+                    <div className="text-[11px] text-stone-400 lg:hidden">图片/消耗</div>
+                    <div className="text-stone-600">{user.image_count || 0} / {user.spent_quota || user.quota_used || 0}</div>
+                  </div>
+                  <div>
+                    <div className="text-[11px] text-stone-400 lg:hidden">最后登录</div>
+                    <div className="text-stone-500">{formatTime(user.last_login_at)}</div>
+                  </div>
+                </div>
+                <div className="grid grid-cols-[minmax(0,1fr)_auto_auto_auto_auto] items-center gap-2 lg:flex lg:flex-wrap">
                   <Input
                     type="number"
                     value={quotaInputs[user.id] ?? String(user.quota)}
                     onChange={(event) => setQuotaInputs((current) => ({ ...current, [user.id]: event.target.value }))}
-                    className="h-8 w-20 rounded-lg border-rose-100 bg-white px-2"
+                    className="h-9 min-w-0 rounded-lg border-rose-100 bg-white px-2 lg:h-8 lg:w-20"
                   />
-                  <Button variant="outline" size="sm" className="h-8 rounded-lg border-rose-100 bg-white" onClick={() => void handleSetQuota(user)}>
+                  <Button variant="outline" size="sm" className="h-9 rounded-lg border-rose-100 bg-white lg:h-8" onClick={() => void handleSetQuota(user)}>
                     改额度
                   </Button>
-                  <Button variant="outline" size="sm" className="h-8 rounded-lg border-rose-100 bg-white" onClick={() => void handleToggleStatus(user)}>
+                  <Button variant="outline" size="sm" className="h-9 rounded-lg border-rose-100 bg-white lg:h-8" onClick={() => void handleToggleStatus(user)}>
                     {user.status === "active" ? "禁用" : "启用"}
                   </Button>
-                  <Button variant="ghost" size="icon" className="size-8 text-stone-500" onClick={() => void handleResetPassword(user)}>
+                  <Button variant="ghost" size="icon" className="size-9 text-stone-500 lg:size-8" onClick={() => void handleResetPassword(user)}>
                     <Copy className="size-4" />
                   </Button>
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="size-8 text-rose-500 hover:bg-rose-50"
+                    className="size-9 text-rose-500 hover:bg-rose-50 lg:size-8"
                     onClick={() => openDeleteUsers([user])}
                     aria-label="删除用户"
                     title="删除用户"

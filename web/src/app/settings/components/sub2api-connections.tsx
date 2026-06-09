@@ -485,8 +485,8 @@ export function Sub2APIConnections() {
   return (
     <>
       <Card className="rounded-lg border-white/80 bg-white/80 shadow-sm">
-        <CardContent className="space-y-6 p-6">
-          <div className="flex items-start justify-between">
+        <CardContent className="space-y-6 p-4 sm:p-6">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="flex items-center gap-3">
               <div className="flex size-10 items-center justify-center rounded-xl bg-stone-100">
                 <ServerCog className="size-5 text-stone-600" />
@@ -498,10 +498,10 @@ export function Sub2APIConnections() {
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              {servers.length > 0 ? <Badge className="rounded-md px-2.5 py-1">{servers.length} 个连接</Badge> : null}
+            <div className="grid w-full gap-2 sm:w-auto sm:grid-cols-none sm:flex sm:items-center">
+              {servers.length > 0 ? <Badge className="w-fit rounded-md px-2.5 py-1">{servers.length} 个连接</Badge> : null}
               <Button
-                className="h-9 rounded-xl bg-stone-950 px-4 text-white hover:bg-stone-800"
+                className="h-10 w-full justify-center rounded-xl bg-stone-950 px-4 text-white hover:bg-stone-800 sm:h-9 sm:w-auto"
                 onClick={openAddDialog}
               >
                 <Plus className="size-4" />
@@ -535,7 +535,7 @@ export function Sub2APIConnections() {
                     key={server.id}
                     className="flex flex-col gap-3 rounded-xl border border-stone-200 bg-white px-4 py-3"
                   >
-                    <div className="flex items-center justify-between gap-3">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                       <div className="min-w-0">
                         <div className="text-sm font-medium text-stone-800">{server.name || server.base_url}</div>
                         <div className="truncate text-xs text-stone-400">
@@ -544,7 +544,7 @@ export function Sub2APIConnections() {
                           {server.group_id ? ` · 分组 ${server.group_id}` : " · 全部分组"}
                         </div>
                       </div>
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-1 self-end sm:self-auto">
                         <button
                           type="button"
                           className="rounded-lg p-2 text-stone-400 transition hover:bg-stone-100 hover:text-stone-700"
@@ -570,10 +570,10 @@ export function Sub2APIConnections() {
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="grid gap-2 sm:flex sm:items-center">
                       <Button
                         variant="outline"
-                        className="h-8 rounded-lg border-stone-200 bg-white px-3 text-xs text-stone-600"
+                        className="h-10 justify-center rounded-lg border-stone-200 bg-white px-3 text-xs text-stone-600 sm:h-8"
                         onClick={() => void handleBrowseAccounts(server)}
                         disabled={isBusy}
                       >
@@ -586,7 +586,7 @@ export function Sub2APIConnections() {
                       </Button>
                       <Button
                         variant="outline"
-                        className="h-8 rounded-lg border-stone-200 bg-white px-3 text-xs text-stone-600"
+                        className="h-10 justify-center rounded-lg border-stone-200 bg-white px-3 text-xs text-stone-600 sm:h-8"
                         onClick={() => void handleBrowseLocalAccounts(server)}
                         disabled={isBusy}
                       >
@@ -669,7 +669,7 @@ export function Sub2APIConnections() {
       </Card>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent showCloseButton={false} className="rounded-2xl p-6">
+        <DialogContent showCloseButton={false} className="max-h-[90vh] overflow-y-auto rounded-2xl p-4 sm:p-6">
           <DialogHeader className="gap-2">
             <DialogTitle>{editingServer ? "编辑连接" : "添加连接"}</DialogTitle>
             <DialogDescription className="text-sm leading-6">
@@ -804,11 +804,11 @@ export function Sub2APIConnections() {
                 />
               )}
               {editingServer ? (
-                <div className="flex items-center justify-between gap-2 text-xs text-stone-500">
+                <div className="grid gap-2 text-xs text-stone-500 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
                   <span>同步时会用分组 ID 过滤，留空 = 同步所有 OpenAI OAuth 账号。</span>
                   <Button
                     variant="outline"
-                    className="h-8 rounded-lg border-stone-200 bg-white px-2 text-xs text-stone-600"
+                    className="h-8 justify-center rounded-lg border-stone-200 bg-white px-2 text-xs text-stone-600"
                     onClick={() => void handleFetchGroups()}
                     disabled={isLoadingGroups}
                   >
@@ -827,17 +827,17 @@ export function Sub2APIConnections() {
               )}
             </div>
           </div>
-          <DialogFooter className="pt-2">
+          <DialogFooter className="grid gap-2 pt-2 sm:flex sm:justify-end">
             <Button
               variant="secondary"
-              className="h-10 rounded-xl bg-stone-100 px-5 text-stone-700 hover:bg-stone-200"
+              className="h-10 w-full rounded-xl bg-stone-100 px-5 text-stone-700 hover:bg-stone-200 sm:w-auto"
               onClick={() => setDialogOpen(false)}
               disabled={isSaving}
             >
               取消
             </Button>
             <Button
-              className="h-10 rounded-xl bg-stone-950 px-5 text-white hover:bg-stone-800"
+              className="h-10 w-full rounded-xl bg-stone-950 px-5 text-white hover:bg-stone-800 sm:w-auto"
               onClick={() => void handleSave()}
               disabled={isSaving}
             >
@@ -849,7 +849,7 @@ export function Sub2APIConnections() {
       </Dialog>
 
       <Dialog open={browserOpen} onOpenChange={setBrowserOpen}>
-        <DialogContent showCloseButton={false} className="max-h-[90vh] max-w-5xl rounded-2xl p-6">
+        <DialogContent showCloseButton={false} className="flex max-h-[90vh] w-[min(94vw,64rem)] max-w-none flex-col overflow-hidden rounded-2xl p-4 sm:p-6">
           <DialogHeader className="gap-2">
             <DialogTitle>选择要导入的账号</DialogTitle>
             <DialogDescription className="text-sm leading-6">
@@ -858,7 +858,7 @@ export function Sub2APIConnections() {
           </DialogHeader>
 
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div className="relative min-w-[260px]">
+            <div className="relative w-full lg:w-[260px]">
               <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-stone-400" />
               <Input
                 value={accountQuery}
@@ -867,10 +867,10 @@ export function Sub2APIConnections() {
                   setAccountPage(1);
                 }}
                 placeholder="搜索邮箱、套餐或名称"
-                className="h-10 rounded-xl border-stone-200 bg-white pl-10"
+                className="h-10 w-full rounded-xl border-stone-200 bg-white pl-10"
               />
             </div>
-            <div className="flex items-center gap-2">
+            <div className="grid w-full gap-2 sm:grid-cols-[120px_minmax(0,1fr)] lg:w-auto lg:grid-cols-[120px_auto]">
               <Select
                 value={pageSize}
                 onValueChange={(value) => {
@@ -878,7 +878,7 @@ export function Sub2APIConnections() {
                   setAccountPage(1);
                 }}
               >
-                <SelectTrigger className="h-10 w-[120px] rounded-xl border-stone-200 bg-white">
+                <SelectTrigger className="h-10 w-full rounded-xl border-stone-200 bg-white">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -891,7 +891,7 @@ export function Sub2APIConnections() {
               </Select>
               <Button
                 variant="outline"
-                className="h-10 rounded-xl border-stone-200 bg-white px-4 text-stone-700"
+                className="h-10 justify-center rounded-xl border-stone-200 bg-white px-4 text-stone-700"
                 onClick={() => handleToggleSelectAllFiltered(!allFilteredSelected)}
               >
                 {allFilteredSelected ? "取消全选" : "全选筛选结果"}
@@ -900,7 +900,7 @@ export function Sub2APIConnections() {
           </div>
 
           <div className="rounded-xl border border-stone-200">
-            <div className="flex items-center justify-between border-b border-stone-100 px-4 py-3 text-sm text-stone-500">
+            <div className="flex flex-col gap-2 border-b border-stone-100 px-4 py-3 text-sm text-stone-500 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-3">
                 <Checkbox
                   checked={allFilteredSelected}
@@ -953,12 +953,12 @@ export function Sub2APIConnections() {
             </div>
           </div>
 
-          <div className="flex items-center justify-between text-sm text-stone-500">
-            <span>
+          <div className="flex flex-col gap-2 text-sm text-stone-500 sm:flex-row sm:items-center sm:justify-between">
+            <span className="text-center sm:text-left">
               第 {filteredAccounts.length === 0 ? 0 : (safeAccountPage - 1) * currentPageSize + 1} -{" "}
               {Math.min(safeAccountPage * currentPageSize, filteredAccounts.length)} 条，共 {filteredAccounts.length} 条
             </span>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center justify-center gap-2">
               <Button
                 variant="outline"
                 className="h-9 rounded-xl border-stone-200 bg-white px-3"
@@ -981,17 +981,17 @@ export function Sub2APIConnections() {
             </div>
           </div>
 
-          <DialogFooter className="pt-2">
+          <DialogFooter className="grid gap-2 pt-2 sm:flex sm:justify-end">
             <Button
               variant="secondary"
-              className="h-10 rounded-xl bg-stone-100 px-5 text-stone-700 hover:bg-stone-200"
+              className="h-10 w-full rounded-xl bg-stone-100 px-5 text-stone-700 hover:bg-stone-200 sm:w-auto"
               onClick={() => setBrowserOpen(false)}
               disabled={isStartingImport}
             >
               取消
             </Button>
             <Button
-              className="h-10 rounded-xl bg-stone-950 px-5 text-white hover:bg-stone-800"
+              className="h-10 w-full rounded-xl bg-stone-950 px-5 text-white hover:bg-stone-800 sm:w-auto"
               onClick={() => void handleStartImport()}
               disabled={isStartingImport || selectedIds.length === 0}
             >
@@ -1003,7 +1003,7 @@ export function Sub2APIConnections() {
       </Dialog>
 
       <Dialog open={exportOpen} onOpenChange={setExportOpen}>
-        <DialogContent showCloseButton={false} className="max-h-[90vh] max-w-5xl rounded-2xl p-6">
+        <DialogContent showCloseButton={false} className="flex max-h-[90vh] w-[min(94vw,64rem)] max-w-none flex-col overflow-hidden rounded-2xl p-4 sm:p-6">
           <DialogHeader className="gap-2">
             <DialogTitle>选择要导入到 Sub2API 的本地账号</DialogTitle>
             <DialogDescription className="text-sm leading-6">
@@ -1012,7 +1012,7 @@ export function Sub2APIConnections() {
           </DialogHeader>
 
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div className="relative min-w-[260px]">
+            <div className="relative w-full lg:w-[260px]">
               <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-stone-400" />
               <Input
                 value={localAccountQuery}
@@ -1021,10 +1021,10 @@ export function Sub2APIConnections() {
                   setLocalAccountPage(1);
                 }}
                 placeholder="搜索邮箱、类型、状态或 ID"
-                className="h-10 rounded-xl border-stone-200 bg-white pl-10"
+                className="h-10 w-full rounded-xl border-stone-200 bg-white pl-10"
               />
             </div>
-            <div className="flex items-center gap-2">
+            <div className="grid w-full gap-2 sm:grid-cols-[120px_minmax(0,1fr)] lg:w-auto lg:grid-cols-[120px_auto]">
               <Select
                 value={localPageSize}
                 onValueChange={(value) => {
@@ -1032,7 +1032,7 @@ export function Sub2APIConnections() {
                   setLocalAccountPage(1);
                 }}
               >
-                <SelectTrigger className="h-10 w-[120px] rounded-xl border-stone-200 bg-white">
+                <SelectTrigger className="h-10 w-full rounded-xl border-stone-200 bg-white">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -1045,7 +1045,7 @@ export function Sub2APIConnections() {
               </Select>
               <Button
                 variant="outline"
-                className="h-10 rounded-xl border-stone-200 bg-white px-4 text-stone-700"
+                className="h-10 justify-center rounded-xl border-stone-200 bg-white px-4 text-stone-700"
                 onClick={() => handleToggleSelectAllFilteredLocal(!allFilteredLocalSelected)}
               >
                 {allFilteredLocalSelected ? "取消全选" : "全选筛选结果"}
@@ -1054,7 +1054,7 @@ export function Sub2APIConnections() {
           </div>
 
           <div className="rounded-xl border border-stone-200">
-            <div className="flex items-center justify-between border-b border-stone-100 px-4 py-3 text-sm text-stone-500">
+            <div className="flex flex-col gap-2 border-b border-stone-100 px-4 py-3 text-sm text-stone-500 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-3">
                 <Checkbox
                   checked={allFilteredLocalSelected}
@@ -1103,13 +1103,13 @@ export function Sub2APIConnections() {
             </div>
           </div>
 
-          <div className="flex items-center justify-between text-sm text-stone-500">
-            <span>
+          <div className="flex flex-col gap-2 text-sm text-stone-500 sm:flex-row sm:items-center sm:justify-between">
+            <span className="text-center sm:text-left">
               第 {filteredLocalAccounts.length === 0 ? 0 : (safeLocalAccountPage - 1) * currentLocalPageSize + 1} -{" "}
               {Math.min(safeLocalAccountPage * currentLocalPageSize, filteredLocalAccounts.length)} 条，共{" "}
               {filteredLocalAccounts.length} 条
             </span>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center justify-center gap-2">
               <Button
                 variant="outline"
                 className="h-9 rounded-xl border-stone-200 bg-white px-3"
@@ -1132,17 +1132,17 @@ export function Sub2APIConnections() {
             </div>
           </div>
 
-          <DialogFooter className="pt-2">
+          <DialogFooter className="grid gap-2 pt-2 sm:flex sm:justify-end">
             <Button
               variant="secondary"
-              className="h-10 rounded-xl bg-stone-100 px-5 text-stone-700 hover:bg-stone-200"
+              className="h-10 w-full rounded-xl bg-stone-100 px-5 text-stone-700 hover:bg-stone-200 sm:w-auto"
               onClick={() => setExportOpen(false)}
               disabled={isStartingExport}
             >
               取消
             </Button>
             <Button
-              className="h-10 rounded-xl bg-stone-950 px-5 text-white hover:bg-stone-800"
+              className="h-10 w-full rounded-xl bg-stone-950 px-5 text-white hover:bg-stone-800 sm:w-auto"
               onClick={() => void handleStartExport()}
               disabled={isStartingExport || selectedLocalIds.length === 0}
             >

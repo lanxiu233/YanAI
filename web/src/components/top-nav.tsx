@@ -13,6 +13,7 @@ import {
   Images,
   KeyRound,
   LogOut,
+  Menu,
   PenLine,
   Settings,
   Sparkles,
@@ -187,23 +188,36 @@ export function TopNav() {
 
   const navItems = session.role === "admin" ? adminNavItems : userNavItems;
   const roleLabel = session.role === "admin" ? "管理员" : "个人用户";
+  const currentNavItem = navItems.find((item) => pathname === item.href) ?? navItems[0];
+  const CurrentIcon = currentNavItem.icon;
   const hasAnnouncement = Boolean(announcement?.enabled && (announcement.title || announcement.content));
   const announcementTime = formatAnnouncementTime(announcement?.updated_at);
 
   return (
-    <header className="border-b border-rose-100/80 bg-white/48 backdrop-blur-xl">
-      <div className="flex min-h-16 items-center justify-between gap-3 px-3 sm:px-5">
+    <header className="border-b border-rose-100/80 bg-white/58 backdrop-blur-xl">
+      <div className="flex min-h-[4.25rem] items-center justify-between gap-2 px-2.5 sm:min-h-16 sm:gap-3 sm:px-5">
         <Link href="/image" className="group flex shrink-0 items-center gap-2.5 whitespace-nowrap">
           <span className="yan-mark-gradient grid size-10 place-items-center rounded-lg text-sm font-black text-white shadow-[0_14px_30px_rgba(243,111,159,0.22)] transition group-hover:brightness-105">
             颜
           </span>
-          <span className="hidden leading-tight sm:block">
+          <span className="hidden leading-tight md:block">
             <span className="block text-[17px] font-bold tracking-tight text-stone-950">颜值AI</span>
             <span className="block text-xs font-medium text-stone-500">Image Studio</span>
           </span>
         </Link>
 
-        <nav className="hide-scrollbar flex flex-1 justify-start gap-1.5 overflow-x-auto sm:justify-center sm:gap-2">
+        <Link
+          href={currentNavItem.href}
+          className="flex min-w-0 flex-1 items-center justify-center gap-2 rounded-xl border border-rose-100 bg-white/72 px-3 py-2 text-sm font-medium text-stone-900 shadow-[0_8px_24px_rgba(84,38,62,0.06)] sm:hidden"
+        >
+          <CurrentIcon className="size-4 shrink-0 text-rose-500" />
+          <span className="truncate">{currentNavItem.label}</span>
+          <span className="shrink-0 rounded-full bg-rose-50 px-2 py-0.5 text-[11px] font-medium text-rose-600">
+            {roleLabel}
+          </span>
+        </Link>
+
+        <nav className="hidden min-w-0 flex-1 justify-center gap-1.5 overflow-x-auto sm:flex sm:gap-2">
           {navItems.map((item) => {
             const active = pathname === item.href;
             const Icon = item.icon;
@@ -225,8 +239,8 @@ export function TopNav() {
           })}
         </nav>
 
-        <div className="flex shrink-0 items-center justify-end gap-2">
-          <span className="hidden rounded-lg border border-rose-100 bg-white/65 px-2.5 py-1 text-[11px] font-medium text-rose-600 sm:inline-block">
+        <div className="flex shrink-0 items-center justify-end gap-1 sm:gap-2">
+          <span className="hidden rounded-lg border border-rose-100 bg-white/65 px-2.5 py-1 text-[11px] font-medium text-rose-600 md:inline-block">
             {roleLabel}
           </span>
           <Popover
@@ -240,7 +254,7 @@ export function TopNav() {
               <button
                 type="button"
                 className={cn(
-                  "relative inline-flex size-9 items-center justify-center rounded-lg transition hover:bg-white/65",
+                  "relative inline-flex size-10 items-center justify-center rounded-lg transition hover:bg-white/65 sm:size-9",
                   hasAnnouncement ? "text-rose-600" : "text-stone-400 hover:text-rose-600",
                 )}
                 aria-label="查看通知"
@@ -273,12 +287,55 @@ export function TopNav() {
               )}
             </PopoverContent>
           </Popover>
-          <span className="hidden rounded-lg border border-rose-100 bg-white/65 px-2.5 py-1 text-[11px] font-medium text-stone-400 sm:inline-block">
+          <Popover>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                className="inline-flex size-10 items-center justify-center rounded-lg text-stone-500 transition hover:bg-white/65 hover:text-rose-600 sm:hidden"
+                aria-label="打开导航菜单"
+              >
+                <Menu className="size-4" />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent align="end" sideOffset={10} className="w-[min(20rem,calc(100vw-1rem))] rounded-2xl border-rose-100 bg-white/98 p-2 sm:hidden">
+              <div className="px-2 py-2">
+                <div className="text-xs font-medium text-stone-400">导航</div>
+                <div className="mt-1 flex items-center gap-2 text-sm font-semibold text-stone-950">
+                  <span>{roleLabel}</span>
+                  <span className="rounded-full bg-stone-100 px-2 py-0.5 text-[11px] font-medium text-stone-500">
+                    v{webConfig.appVersion}
+                  </span>
+                </div>
+              </div>
+              <div className="grid gap-1">
+                {navItems.map((item) => {
+                  const active = pathname === item.href;
+                  const Icon = item.icon;
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={cn(
+                        "flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-medium transition",
+                        active
+                          ? "bg-rose-50 text-rose-700 shadow-[inset_0_0_0_1px_rgba(244,63,94,0.12)]"
+                          : "text-stone-600 hover:bg-stone-50 hover:text-stone-950",
+                      )}
+                    >
+                      <Icon className="size-4 shrink-0" />
+                      <span>{item.label}</span>
+                    </Link>
+                  );
+                })}
+              </div>
+            </PopoverContent>
+          </Popover>
+          <span className="hidden rounded-lg border border-rose-100 bg-white/65 px-2.5 py-1 text-[11px] font-medium text-stone-400 lg:inline-block">
             v{webConfig.appVersion}
           </span>
           <button
             type="button"
-            className="inline-flex size-9 items-center justify-center rounded-lg text-stone-400 transition hover:bg-white/65 hover:text-rose-600"
+            className="inline-flex size-10 items-center justify-center rounded-lg text-stone-400 transition hover:bg-white/65 hover:text-rose-600 sm:size-9"
             onClick={() => void handleLogout()}
             aria-label="退出登录"
           >

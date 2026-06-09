@@ -117,7 +117,7 @@ export function ConfigCard() {
 
   return (
     <Card className="rounded-lg border-white/80 bg-white/80 shadow-sm">
-      <CardContent className="space-y-4 p-6">
+      <CardContent className="space-y-4 p-4 sm:p-6">
         <div className="rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm leading-6 text-stone-600">
           管理员登录密钥继续从部署配置读取，不再在此页面展示；如需分发给其他人，请在下方创建普通用户密钥。
         </div>
@@ -157,11 +157,11 @@ export function ConfigCard() {
                   : `代理不可用：${proxyTestResult.error ?? "未知错误"}（用时 ${proxyTestResult.latency_ms} ms）`}
               </div>
             ) : null}
-            <div className="flex justify-end">
+            <div className="grid">
               <Button
                 type="button"
                 variant="outline"
-                className="h-9 rounded-xl border-stone-200 bg-white px-4 text-stone-700"
+                className="h-10 w-full justify-center rounded-xl border-stone-200 bg-white px-4 text-stone-700 sm:h-9 sm:w-auto sm:justify-self-end"
                 onClick={() => void handleTestProxy()}
                 disabled={isTestingProxy}
               >
@@ -401,7 +401,7 @@ export function ConfigCard() {
             </div>
             <div className="flex flex-col gap-2 rounded-lg border border-fuchsia-100 bg-fuchsia-50 px-3 py-2 text-sm text-fuchsia-900 md:flex-row md:items-center md:justify-between">
               <span className="break-all">回调 URL：{linuxDoCallbackUrl}</span>
-              <Button type="button" variant="outline" className="h-8 shrink-0 rounded-lg border-fuchsia-200 bg-white px-3 text-fuchsia-700" onClick={() => void copyLinuxDoCallbackUrl()}>
+              <Button type="button" variant="outline" className="h-10 w-full shrink-0 rounded-lg border-fuchsia-200 bg-white px-3 text-fuchsia-700 md:h-8 md:w-auto" onClick={() => void copyLinuxDoCallbackUrl()}>
                 <Copy className="size-3.5" />
                 复制
               </Button>
@@ -433,9 +433,9 @@ export function ConfigCard() {
           </div>
         </div>
 
-        <div className="flex justify-end">
+        <div className="grid">
           <Button
-            className="h-10 rounded-xl bg-stone-950 px-5 text-white hover:bg-stone-800"
+            className="h-10 w-full justify-center rounded-xl bg-stone-950 px-5 text-white hover:bg-stone-800 sm:w-auto sm:justify-self-end"
             onClick={() => void handleSaveConfig()}
             disabled={isSavingConfig}
           >

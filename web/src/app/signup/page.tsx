@@ -89,13 +89,13 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="relative isolate grid min-h-[100dvh] w-full place-items-center overflow-hidden px-4 py-6 sm:py-8">
+    <div className="relative isolate grid min-h-[100dvh] w-full place-items-center overflow-x-hidden px-4 py-6 sm:py-8">
       <div className="absolute inset-0 -z-20 bg-[radial-gradient(circle_at_18%_18%,rgba(202,164,232,0.18),transparent_30%),radial-gradient(circle_at_86%_18%,rgba(243,111,159,0.17),transparent_28%),linear-gradient(135deg,#fff8fb_0%,#f8eef4_48%,#f5f0ea_100%)]" />
       <div className="yan-soft-grid absolute inset-0 -z-10 opacity-60" />
 
       <div className="grid w-full max-w-5xl overflow-hidden rounded-[28px] border border-white/75 bg-white/80 shadow-[0_28px_90px_rgba(84,38,62,0.12)] backdrop-blur-xl lg:grid-cols-[minmax(0,1fr)_400px]">
         <Card className="border-0 bg-white/90 shadow-none">
-          <CardContent className="mx-auto flex min-h-[600px] w-full max-w-[460px] flex-col justify-center space-y-6 p-6 sm:p-10">
+          <CardContent className="mx-auto flex w-full max-w-[460px] flex-col justify-center space-y-6 p-6 sm:min-h-[600px] sm:p-10">
             <div className="flex items-center gap-3 lg:hidden">
               <span className="yan-mark-gradient grid size-10 place-items-center rounded-xl text-sm font-black text-white shadow-[0_14px_30px_rgba(243,111,159,0.22)]">
                 颜
@@ -177,7 +177,7 @@ export default function SignupPage() {
                       <Button
                         type="button"
                         variant="outline"
-                        className="h-11 rounded-xl border-rose-100 bg-white px-4 text-rose-600 hover:bg-rose-50 active:scale-[0.99]"
+                        className="h-11 w-full rounded-xl border-rose-100 bg-white px-4 text-rose-600 hover:bg-rose-50 active:scale-[0.99] sm:w-auto"
                         onClick={() => void handleSendCode()}
                         disabled={isSendingCode || !email.trim()}
                       >

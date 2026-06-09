@@ -166,8 +166,8 @@ function RedeemCodesContent() {
 
       <Card className="overflow-hidden rounded-lg border-white/80 bg-white/80 shadow-sm">
         <CardContent className="p-0">
-          <div className="flex flex-wrap items-center gap-3 border-b border-rose-50 px-5 py-3">
-            <label className="flex items-center gap-2 text-sm text-stone-500">
+          <div className="flex flex-col gap-2 border-b border-rose-50 px-5 py-3 sm:flex-row sm:flex-wrap sm:items-center">
+            <label className="flex min-h-10 w-full items-center gap-2 rounded-lg text-sm text-stone-500 sm:min-h-0 sm:w-auto">
               <Checkbox
                 checked={allSelected}
                 onCheckedChange={(checked) => toggleSelectAll(Boolean(checked))}
@@ -177,7 +177,7 @@ function RedeemCodesContent() {
             </label>
             <Button
               variant="ghost"
-              className="h-8 rounded-lg px-3 text-rose-500 hover:bg-rose-50 hover:text-rose-600"
+              className="h-10 min-h-10 w-full justify-center rounded-lg px-3 text-rose-500 hover:bg-rose-50 hover:text-rose-600 md:h-8 md:min-h-8 md:w-auto"
               onClick={handleExportCodes}
               disabled={selectedCodes.length === 0}
             >
@@ -186,7 +186,7 @@ function RedeemCodesContent() {
             </Button>
             <Button
               variant="ghost"
-              className="h-8 rounded-lg px-3 text-rose-500 hover:bg-rose-50 hover:text-rose-600"
+              className="h-10 min-h-10 w-full justify-center rounded-lg px-3 text-rose-500 hover:bg-rose-50 hover:text-rose-600 md:h-8 md:min-h-8 md:w-auto"
               onClick={() => openDeleteCodes(selectedCodes)}
               disabled={selectedCodes.length === 0 || isDeleting}
             >
@@ -208,17 +208,20 @@ function RedeemCodesContent() {
           ) : (
             items.map((item) => (
               <div key={item.id} className="grid gap-3 border-b border-rose-50 px-5 py-4 text-sm last:border-0 lg:grid-cols-[44px_1.4fr_100px_100px_120px_160px_180px] lg:items-center">
-                <Checkbox
-                  checked={selectedIds.includes(item.id)}
-                  onCheckedChange={(checked) => {
-                    setSelectedIds((current) =>
-                      checked
-                        ? Array.from(new Set([...current, item.id]))
-                        : current.filter((id) => id !== item.id),
-                    );
-                  }}
-                  aria-label={`选择兑换码 ${item.code}`}
-                />
+                <label className="flex min-h-10 items-center gap-2 text-xs text-stone-400 lg:min-h-0">
+                  <Checkbox
+                    checked={selectedIds.includes(item.id)}
+                    onCheckedChange={(checked) => {
+                      setSelectedIds((current) =>
+                        checked
+                          ? Array.from(new Set([...current, item.id]))
+                          : current.filter((id) => id !== item.id),
+                      );
+                    }}
+                    aria-label={`选择兑换码 ${item.code}`}
+                  />
+                  <span className="lg:hidden">选择</span>
+                </label>
                 <div className="flex min-w-0 items-center gap-3">
                   <div className="rounded-2xl bg-rose-50 p-3 text-rose-500">
                     <Gift className="size-4" />
@@ -232,14 +235,14 @@ function RedeemCodesContent() {
                 <div className="text-stone-600">{item.used_count}/{item.max_uses}</div>
                 <Badge variant={item.status === "enabled" ? "success" : "secondary"}>{item.status === "enabled" ? "启用" : "停用"}</Badge>
                 <div className="text-xs text-stone-500">{item.expires_at || "永不过期"}</div>
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm" className="h-8 rounded-lg border-rose-100 bg-white" onClick={() => void handleToggle(item)}>
+                <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 sm:flex sm:flex-wrap">
+                  <Button variant="outline" size="sm" className="h-10 justify-center rounded-lg border-rose-100 bg-white sm:h-8" onClick={() => void handleToggle(item)}>
                     {item.status === "enabled" ? "停用" : "启用"}
                   </Button>
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="size-8 text-stone-500"
+                    className="size-10 text-stone-500 sm:size-8"
                     onClick={() => {
                       void navigator.clipboard.writeText(item.code);
                       toast.success("兑换码已复制");
@@ -263,11 +266,11 @@ function RedeemCodesContent() {
             <DialogTitle>{deleteCount === 1 ? "删除兑换码" : "批量删除兑换码"}</DialogTitle>
             <DialogDescription>{deleteDescription}</DialogDescription>
           </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" className="rounded-xl border-stone-200 bg-white" onClick={() => setDeleteTarget(null)} disabled={isDeleting}>
+          <DialogFooter className="grid gap-2 sm:flex sm:justify-end">
+            <Button variant="outline" className="h-10 w-full rounded-xl border-stone-200 bg-white sm:w-auto" onClick={() => setDeleteTarget(null)} disabled={isDeleting}>
               取消
             </Button>
-            <Button variant="destructive" className="rounded-xl" onClick={() => void handleDeleteCodes()} disabled={isDeleting}>
+            <Button variant="destructive" className="h-10 w-full rounded-xl sm:w-auto" onClick={() => void handleDeleteCodes()} disabled={isDeleting}>
               {isDeleting ? <LoaderCircle className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
               删除
             </Button>

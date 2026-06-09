@@ -272,7 +272,7 @@ function ImageManagerContent() {
           <div className="text-xs font-semibold tracking-[0.18em] text-stone-500 uppercase">Images</div>
           <h1 className="text-2xl font-semibold tracking-tight">图片管理</h1>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="grid w-full gap-2 sm:grid-cols-2 xl:w-auto xl:grid-cols-[240px_176px_160px_auto_auto_auto_auto]">
           <DateRangeFilter
             startDate={startDate}
             endDate={endDate}
@@ -289,7 +289,7 @@ function ImageManagerContent() {
               setPage(1);
             }}
             placeholder="用户 ID"
-            className="h-10 w-44 rounded-xl border-stone-200 bg-white"
+            className="h-10 w-full rounded-xl border-stone-200 bg-white xl:w-44"
           />
           <Input
             value={channel}
@@ -298,7 +298,7 @@ function ImageManagerContent() {
               setPage(1);
             }}
             placeholder="渠道"
-            className="h-10 w-40 rounded-xl border-stone-200 bg-white"
+            className="h-10 w-full rounded-xl border-stone-200 bg-white xl:w-40"
           />
           <Button variant="outline" onClick={() => setWebdavOpen(true)} className="h-10 rounded-xl border-stone-200 bg-white px-4 text-stone-700">
             <Settings className="size-4" />
@@ -320,7 +320,7 @@ function ImageManagerContent() {
 
       <Card className="rounded-lg border-white/80 bg-white/80 shadow-sm">
         <CardContent className="p-0">
-          <div className="flex flex-col gap-3 border-b border-stone-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-3 border-b border-stone-100 px-4 py-4 sm:px-5 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex flex-wrap items-center gap-3 text-sm text-stone-600">
               <span className="flex items-center gap-2">
                 <ImageIcon className="size-4" />
@@ -328,32 +328,33 @@ function ImageManagerContent() {
               </span>
               {selectedCount > 0 ? <span className="rounded-full bg-stone-100 px-2.5 py-1 text-xs font-medium text-stone-700">已选 {selectedCount} 张</span> : null}
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="flex h-8 items-center gap-2 rounded-lg border border-stone-200 bg-white px-3 text-sm text-stone-600">
+            <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center">
+              <div className="col-span-2 flex min-h-10 items-center justify-center gap-2 rounded-lg border border-stone-200 bg-white px-3 text-sm text-stone-600 sm:col-span-1 sm:justify-start lg:min-h-8">
                 <Checkbox
                   checked={allCurrentSelected ? true : someCurrentSelected ? "indeterminate" : false}
                   onCheckedChange={(checked) => toggleRows(items, checked === true)}
                   aria-label="选择本页图片"
                   disabled={items.length === 0 || isLoading}
+                  className="size-10 rounded-lg border-stone-300 bg-white lg:size-4 lg:rounded-[4px]"
                 />
                 本页全选
               </div>
               {selectedCount > 0 ? (
-                <Button variant="ghost" className="h-8 rounded-lg px-3 text-stone-500" onClick={() => setSelectedItems({})}>
+                <Button variant="ghost" className="h-10 min-h-10 rounded-lg px-3 text-stone-500 lg:h-8 lg:min-h-8" onClick={() => setSelectedItems({})}>
                   <X className="size-4" />
                   清空选择
                 </Button>
               ) : null}
               <Button
                 variant="destructive"
-                className="h-8 rounded-lg px-3"
+                className="h-10 min-h-10 rounded-lg px-3 lg:h-8 lg:min-h-8"
                 onClick={openDeleteSelected}
                 disabled={selectedCount === 0 || isLoading || isDeleting}
               >
                 {isDeleting ? <LoaderCircle className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
                 删除所选
               </Button>
-              <Button variant="ghost" className="h-8 rounded-lg px-3 text-stone-500" onClick={() => void loadImages()} disabled={isLoading}>
+              <Button variant="ghost" className="h-10 min-h-10 rounded-lg px-3 text-stone-500 lg:h-8 lg:min-h-8" onClick={() => void loadImages()} disabled={isLoading}>
                 <RefreshCw className={`size-4 ${isLoading ? "animate-spin" : ""}`} />
                 刷新
               </Button>
@@ -421,7 +422,7 @@ function ImageManagerContent() {
                                 }));
                               }}
                             />
-                            <span className="absolute right-2 bottom-2 rounded-full bg-black/50 p-2 text-white opacity-0 transition group-hover:opacity-100">
+                            <span className="absolute right-2 bottom-2 rounded-full bg-black/55 p-2 text-white shadow-sm transition sm:opacity-0 sm:group-hover:opacity-100">
                               <Maximize2 className="size-4" />
                             </span>
                           </button>
@@ -464,16 +465,18 @@ function ImageManagerContent() {
             </div>
           )}
           {!isLoading && total > 0 ? (
-            <div className="flex items-center justify-end gap-2 border-t border-stone-100 px-4 py-3 text-sm text-stone-500">
-              <span>
+            <div className="flex flex-col gap-2 border-t border-stone-100 px-4 py-3 text-sm text-stone-500 sm:flex-row sm:items-center sm:justify-end">
+              <span className="text-center sm:text-left">
                 第 {safePage} / {pageCount} 页，共 {total} 张
               </span>
-              <Button variant="outline" size="icon" className="size-9 rounded-lg border-stone-200 bg-white" disabled={safePage <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))}>
-                <ChevronLeft className="size-4" />
-              </Button>
-              <Button variant="outline" size="icon" className="size-9 rounded-lg border-stone-200 bg-white" disabled={safePage >= pageCount} onClick={() => setPage((value) => Math.min(pageCount, value + 1))}>
-                <ChevronRight className="size-4" />
-              </Button>
+              <div className="flex items-center justify-center gap-2">
+                <Button variant="outline" size="icon" className="size-9 rounded-lg border-stone-200 bg-white" disabled={safePage <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))}>
+                  <ChevronLeft className="size-4" />
+                </Button>
+                <Button variant="outline" size="icon" className="size-9 rounded-lg border-stone-200 bg-white" disabled={safePage >= pageCount} onClick={() => setPage((value) => Math.min(pageCount, value + 1))}>
+                  <ChevronRight className="size-4" />
+                </Button>
+              </div>
             </div>
           ) : null}
         </CardContent>
@@ -500,11 +503,11 @@ function ImageManagerContent() {
             <DialogTitle>{deleteCount === 1 ? "删除图片" : "批量删除图片"}</DialogTitle>
             <DialogDescription>确认删除选中的 {deleteCount} 张图片吗？删除后图片文件和管理记录将无法恢复。</DialogDescription>
           </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteTarget(null)} disabled={isDeleting}>
+          <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button variant="outline" className="w-full sm:w-auto" onClick={() => setDeleteTarget(null)} disabled={isDeleting}>
               取消
             </Button>
-            <Button variant="destructive" onClick={() => void handleDeleteImages()} disabled={isDeleting}>
+            <Button variant="destructive" className="w-full sm:w-auto" onClick={() => void handleDeleteImages()} disabled={isDeleting}>
               {isDeleting ? <LoaderCircle className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
               删除
             </Button>

@@ -180,8 +180,8 @@ export function ImageResults({
 
   if (!selectedConversation) {
     return (
-      <div className="grid min-h-[520px] items-center gap-4 lg:grid-cols-[minmax(0,1.08fr)_minmax(280px,.92fr)]">
-        <div className="relative min-h-[420px] overflow-hidden rounded-lg border border-white/70 bg-white/52 shadow-sm">
+      <div className="grid gap-4 sm:min-h-[520px] sm:items-center lg:grid-cols-[minmax(0,1.08fr)_minmax(280px,.92fr)]">
+        <div className="relative min-h-[280px] overflow-hidden rounded-lg border border-white/70 bg-white/52 shadow-sm sm:min-h-[420px]">
           <img
             src={emptyStateHero.preview}
             alt={emptyStateHero.title}
@@ -253,12 +253,12 @@ export function ImageResults({
                   </div>
                   <p className="line-clamp-2 text-sm leading-6 text-stone-800">{turn.prompt}</p>
                 </div>
-                <div className="flex shrink-0 items-center gap-1.5">
+                <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:shrink-0 sm:items-center sm:gap-1.5">
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
-                    className="h-8 rounded-lg border-rose-100 bg-white/85 px-2.5 text-stone-700 hover:bg-white"
+                    className="h-9 justify-center rounded-lg border-rose-100 bg-white/85 px-2.5 text-stone-700 hover:bg-white sm:justify-start"
                     onClick={() => void copyTurnPrompt(turn.prompt)}
                   >
                     <Copy className="size-4" />
@@ -268,7 +268,7 @@ export function ImageResults({
                     type="button"
                     variant="outline"
                     size="sm"
-                    className="h-8 rounded-lg border-rose-100 bg-white/85 px-2.5 text-stone-700 hover:bg-white"
+                    className="h-9 justify-center rounded-lg border-rose-100 bg-white/85 px-2.5 text-stone-700 hover:bg-white sm:justify-start"
                     onClick={() => void shareTurnPrompt(turn)}
                   >
                     <Share2 className="size-4" />
@@ -279,14 +279,14 @@ export function ImageResults({
                       type="button"
                       variant="outline"
                       size="sm"
-                      className="h-8 rounded-lg border-amber-200 bg-amber-50 px-2.5 text-amber-800 hover:bg-amber-100"
+                      className="h-9 justify-center rounded-lg border-amber-200 bg-amber-50 px-2.5 text-amber-800 hover:bg-amber-100 sm:justify-start"
                       onClick={() => void onRetryTurn(selectedConversation.id, turn.id)}
                     >
                       <RotateCcw className="size-4" />
                       重试
                     </Button>
                   ) : null}
-                  <div className="rounded-full bg-rose-50 px-3 py-1 text-xs font-semibold text-stone-600">
+                  <div className="flex h-9 items-center justify-center rounded-full bg-rose-50 px-3 py-1 text-xs font-semibold text-stone-600">
                     {turn.count} 张
                   </div>
                 </div>
@@ -366,7 +366,7 @@ export function ImageResults({
                           <div className="text-left text-xs font-medium text-white/90">点击放大预览</div>
                         </div>
                       </button>
-                      <div className="flex items-center justify-between gap-2 px-3 py-3">
+                      <div className="flex flex-col gap-2 px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
                         <div className="min-w-0 text-xs text-stone-500">
                           <span>结果 {index + 1}</span>
                           {imageMeta ? <span className="ml-2 text-stone-400">{imageMeta}</span> : null}
@@ -374,7 +374,7 @@ export function ImageResults({
                         <Button
                           variant="outline"
                           size="sm"
-                          className="rounded-lg border-rose-100 bg-white/85 text-stone-700 hover:bg-white"
+                          className="w-full justify-center rounded-lg border-rose-100 bg-white/85 text-stone-700 hover:bg-white sm:w-auto"
                           onClick={() => onContinueEdit(selectedConversation.id, image)}
                         >
                           <Sparkles className="size-4" />
@@ -433,7 +433,7 @@ export function ImageResults({
             ) : null}
 
             {turn.status === "error" && turn.error ? (
-              <div className="mx-4 mb-4 border-l-2 border-amber-300 bg-amber-50/70 px-4 py-3 text-sm leading-6 text-amber-700">
+              <div className="mx-4 mb-4 rounded-lg border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm leading-6 text-amber-700">
                 {turn.error}
               </div>
             ) : null}

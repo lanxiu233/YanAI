@@ -20,9 +20,9 @@ export function CPAPoolsCard() {
 
   return (
     <Card className="rounded-lg border-white/80 bg-white/80 shadow-sm">
-      <CardContent className="space-y-6 p-6">
-        <div className="flex items-start justify-between">
-          <div className="flex items-center gap-3">
+      <CardContent className="space-y-6 p-4 sm:p-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex min-w-0 items-start gap-3">
             <div className="flex size-10 items-center justify-center rounded-xl bg-stone-100">
               <ServerCog className="size-5 text-stone-600" />
             </div>
@@ -31,9 +31,9 @@ export function CPAPoolsCard() {
               <p className="text-sm text-stone-500">先配置连接，再按需查询远程账号并选择导入到本地号池。</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            {pools.length > 0 ? <Badge className="rounded-md px-2.5 py-1">{pools.length} 个连接</Badge> : null}
-            <Button className="h-9 rounded-xl bg-stone-950 px-4 text-white hover:bg-stone-800" onClick={openAddDialog}>
+          <div className="grid w-full gap-2 sm:w-auto sm:grid-cols-none sm:flex sm:items-center">
+            {pools.length > 0 ? <Badge className="w-fit rounded-md px-2.5 py-1">{pools.length} 个连接</Badge> : null}
+            <Button className="h-10 w-full justify-center rounded-xl bg-stone-950 px-4 text-white hover:bg-stone-800 sm:h-9 sm:w-auto" onClick={openAddDialog}>
               <Plus className="size-4" />
               添加连接
             </Button>
@@ -63,15 +63,15 @@ export function CPAPoolsCard() {
 
               return (
                 <div key={pool.id} className="flex flex-col gap-3 rounded-xl border border-stone-200 bg-white px-4 py-3">
-                  <div className="flex items-center justify-between gap-3">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div className="min-w-0">
                       <div className="text-sm font-medium text-stone-800">{pool.name || pool.base_url}</div>
                       <div className="truncate text-xs text-stone-400">{pool.base_url}</div>
                     </div>
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-2 self-end sm:self-auto">
                       <button
                         type="button"
-                        className="rounded-lg p-2 text-stone-400 transition hover:bg-stone-100 hover:text-stone-700"
+                        className="flex size-10 items-center justify-center rounded-lg text-stone-400 transition hover:bg-stone-100 hover:text-stone-700 sm:size-8"
                         onClick={() => openEditDialog(pool)}
                         disabled={isBusy}
                         title="编辑"
@@ -80,7 +80,7 @@ export function CPAPoolsCard() {
                       </button>
                       <button
                         type="button"
-                        className="rounded-lg p-2 text-stone-400 transition hover:bg-rose-50 hover:text-rose-500"
+                        className="flex size-10 items-center justify-center rounded-lg text-stone-400 transition hover:bg-rose-50 hover:text-rose-500 sm:size-8"
                         onClick={() => void deletePool(pool)}
                         disabled={isBusy}
                         title="删除"
@@ -94,10 +94,10 @@ export function CPAPoolsCard() {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="grid gap-2 sm:flex sm:items-center">
                     <Button
                       variant="outline"
-                      className="h-8 rounded-lg border-stone-200 bg-white px-3 text-xs text-stone-600"
+                      className="h-10 w-full justify-center rounded-lg border-stone-200 bg-white px-3 text-sm text-stone-600 sm:h-8 sm:w-auto sm:text-xs"
                       onClick={() => void browseFiles(pool)}
                       disabled={isBusy}
                     >
@@ -114,7 +114,7 @@ export function CPAPoolsCard() {
                     <div className="space-y-2 rounded-xl bg-stone-50 px-3 py-3">
                       <div className="text-xs font-medium tracking-[0.16em] text-stone-400 uppercase">导入任务</div>
                       <div className="rounded-lg border border-stone-200 bg-white px-3 py-3">
-                        <div className="flex items-center justify-between gap-3">
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                           <div className="min-w-0">
                             <div className="text-sm font-medium text-stone-700">
                               状态 {importJob.status}，已处理 {importJob.completed}/{importJob.total}
@@ -131,7 +131,7 @@ export function CPAPoolsCard() {
                                   ? "danger"
                                   : "info"
                             }
-                            className="rounded-md"
+                            className="w-fit rounded-md"
                           >
                             {progress}%
                           </Badge>

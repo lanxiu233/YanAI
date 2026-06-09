@@ -100,7 +100,7 @@ export function ImageSidebar({
                     type="button"
                     onClick={() => void onDeleteConversation(conversation.id)}
                     className={cn(
-                      "absolute top-3 right-2 inline-flex size-7 items-center justify-center rounded-md opacity-0 transition group-hover:opacity-100",
+                      "absolute top-3 right-2 inline-flex size-8 items-center justify-center rounded-md transition sm:size-7 sm:opacity-0 sm:group-hover:opacity-100",
                       active
                         ? "text-white/55 hover:bg-white/10 hover:text-white"
                         : "text-stone-400 hover:bg-rose-50 hover:text-rose-500",

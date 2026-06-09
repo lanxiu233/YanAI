@@ -1122,7 +1122,7 @@ function ImagePageContent({ session }: { session: StoredAuthSession }) {
       <section
         ref={imageStudioGridRef}
         style={imageStudioGridStyle}
-        className="grid h-full min-h-0 w-full grid-cols-1 gap-3 overflow-y-auto lg:grid-cols-[300px_minmax(0,1fr)] lg:overflow-hidden xl:grid-cols-[300px_minmax(0,1fr)_var(--image-composer-panel-width)]"
+        className="grid w-full grid-cols-1 gap-3 lg:h-full lg:min-h-0 lg:grid-cols-[300px_minmax(0,1fr)] lg:overflow-hidden xl:grid-cols-[300px_minmax(0,1fr)_var(--image-composer-panel-width)]"
       >
         <div className="yan-panel hidden min-h-0 overflow-hidden rounded-lg lg:row-span-2 lg:flex xl:row-span-1">
           <ImageStudioSidebar
@@ -1161,7 +1161,7 @@ function ImagePageContent({ session }: { session: StoredAuthSession }) {
           </DialogContent>
         </Dialog>
 
-        <div className="flex min-h-0 flex-col gap-3 overflow-hidden">
+        <div className="flex min-w-0 flex-col gap-3 lg:min-h-0 lg:overflow-hidden">
           <div className="flex items-center justify-between gap-2 lg:hidden">
             <Button
               variant="outline"
@@ -1193,12 +1193,12 @@ function ImagePageContent({ session }: { session: StoredAuthSession }) {
                   <Sparkles className="size-3.5" />
                   颜值AI Studio
                 </div>
-                <h1 className="mt-3 truncate text-2xl font-black tracking-tight text-stone-950">月光影像创作台</h1>
-                <p className="mt-1 truncate text-sm text-stone-500">
+                <h1 className="mt-3 text-2xl font-black tracking-tight text-stone-950 text-balance sm:text-3xl">月光影像创作台</h1>
+                <p className="mt-1 max-w-[42rem] text-sm leading-6 text-stone-500">
                   选模板或输入提示词 · 上传参考图 · 生成后继续编辑
                 </p>
               </div>
-              <div className="grid min-w-[260px] grid-cols-3 gap-2 text-center text-xs">
+              <div className="grid w-full grid-cols-3 gap-2 text-center text-xs md:w-auto md:min-w-[260px]">
                 {[
                   ["1", "选模板"],
                   ["2", imageMode === "edit" ? "放参考图" : "写描述"],
@@ -1222,15 +1222,15 @@ function ImagePageContent({ session }: { session: StoredAuthSession }) {
             </div>
           </header>
 
-          <div className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 2xl:grid-cols-4">
             <WorkspaceMetric label="今日生成" value={workspaceStats.todayGenerated} />
             <WorkspaceMetric label="成功率" value={workspaceStats.successRate} />
             <WorkspaceMetric label="处理中" value={workspaceStats.active} />
             <WorkspaceMetric label="历史作品" value={workspaceStats.successImages} />
           </div>
 
-          <div className="min-h-0 flex-1 overflow-hidden">
-            <div ref={resultsViewportRef} className="yan-panel h-full min-h-0 overflow-y-auto rounded-lg">
+          <div className="lg:min-h-0 lg:flex-1 lg:overflow-hidden">
+            <div ref={resultsViewportRef} className="yan-panel rounded-lg lg:h-full lg:min-h-0 lg:overflow-y-auto">
               <div className="sticky top-0 z-10 flex items-center justify-between border-b border-rose-100/70 bg-white/72 px-4 py-3 backdrop-blur-xl">
                 <div className="min-w-0">
                   <h2 className="text-base font-bold text-stone-950">生成画面</h2>
@@ -1257,7 +1257,7 @@ function ImagePageContent({ session }: { session: StoredAuthSession }) {
         </div>
 
         <aside
-          className={`yan-panel relative min-h-0 overflow-hidden rounded-lg lg:col-span-2 xl:col-span-1 ${
+          className={`yan-panel relative rounded-lg lg:col-span-2 lg:min-h-0 lg:overflow-hidden xl:col-span-1 ${
             isComposerPanelResizing ? "ring-2 ring-rose-100" : ""
           }`}
         >
