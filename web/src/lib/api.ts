@@ -342,6 +342,46 @@ export type CheckinStatus = {
   max_quota: number;
 };
 
+export type BillingPlan = {
+  id: string;
+  label: string;
+  quota: number;
+  price: string;
+  enabled: boolean;
+  sort_order?: number;
+};
+
+export type BillingSettings = {
+  enabled: boolean;
+  gateway_url?: string;
+  pid?: string;
+  key?: string;
+  key_set?: boolean;
+  payment_type?: string;
+  notify_url?: string;
+  return_url?: string;
+  frontend_url?: string;
+  support_url?: string;
+  disabled_reason?: string;
+};
+
+export type PaymentOrder = {
+  id: string;
+  order_no: string;
+  trade_no?: string;
+  user_id: string;
+  user_email?: string;
+  plan_id: string;
+  plan_label: string;
+  quota: number;
+  money: string;
+  status: "pending" | "paid" | string;
+  pay_url?: string;
+  created_at: string;
+  paid_at?: string;
+  updated_at?: string;
+};
+
 export type RegisterConfig = {
   enabled: boolean;
   mail: {
@@ -453,6 +493,39 @@ export async function checkInToday() {
     checkin: CheckinStatus;
   }>("/api/me/checkin", {
     method: "POST",
+  });
+}
+
+export async function fetchBillingPlans() {
+  return httpRequest<{ settings: BillingSettings; plans: BillingPlan[] }>("/api/billing/plans");
+}
+
+export async function fetchMyPaymentOrders() {
+  return httpRequest<{ items: PaymentOrder[] }>("/api/billing/orders");
+}
+
+export async function createPaymentOrder(planId: string, paymentType: "alipay" | "wxpay") {
+  return httpRequest<{ order: PaymentOrder; pay_url: string }>("/api/billing/orders", {
+    method: "POST",
+    body: { plan_id: planId, payment_type: paymentType },
+  });
+}
+
+export async function fetchAdminBilling() {
+  return httpRequest<{ settings: BillingSettings; plans: BillingPlan[]; orders: PaymentOrder[] }>("/api/admin/billing");
+}
+
+export async function updateAdminBilling(payload: { settings: BillingSettings; plans: BillingPlan[] }) {
+  return httpRequest<{ settings: BillingSettings; plans: BillingPlan[]; orders: PaymentOrder[] }>("/api/admin/billing", {
+    method: "POST",
+    body: payload,
+  });
+}
+
+export async function generatePromptWithAssistant(payload: { goal: string; style?: string; mode?: string; size?: string }) {
+  return httpRequest<{ prompt: string; raw?: unknown }>("/api/me/prompt-assistant", {
+    method: "POST",
+    body: payload,
   });
 }
 

@@ -81,10 +81,13 @@
   --yan-lavender: #caa4e8;
   --yan-champagne: #d5aa61;
   --yan-ink: #2a1822;
-  --yan-panel: rgba(255, 255, 255, 0.72);
-  --yan-panel-strong: rgba(255, 255, 255, 0.9);
-  --yan-border: rgba(113, 59, 83, 0.13);
-  --yan-shadow: 0 24px 70px rgba(84, 38, 62, 0.14);
+  --yan-bg: #f8f6f7;
+  --yan-surface: #ffffff;
+  --yan-surface-muted: #f2eef1;
+  --yan-panel: rgba(255, 255, 255, 0.92);
+  --yan-panel-strong: #ffffff;
+  --yan-border: rgba(80, 57, 68, 0.14);
+  --yan-shadow: 0 8px 24px rgba(42, 24, 34, 0.08);
 }
 
 .dark {
@@ -127,40 +130,34 @@
   }
   body {
     @apply bg-background text-foreground;
-    background:
-      linear-gradient(125deg, rgba(243, 111, 159, 0.16), transparent 34%),
-      linear-gradient(238deg, transparent 38%, rgba(202, 164, 232, 0.14) 73%, transparent 100%),
-      linear-gradient(180deg, #fff8fb 0%, #fff4f8 52%, #fff1f5 100%);
+    background: var(--yan-bg);
     letter-spacing: 0;
   }
 }
 
 @layer utilities {
   .yan-app-surface {
-    border: 1px solid rgba(255, 255, 255, 0.72);
-    background: rgba(255, 255, 255, 0.56);
+    border: 1px solid var(--yan-border);
+    background: var(--yan-surface);
     box-shadow: var(--yan-shadow);
-    backdrop-filter: blur(24px);
   }
 
   .yan-panel {
-    border: 1px solid rgba(255, 255, 255, 0.78);
+    border: 1px solid var(--yan-border);
     background: var(--yan-panel);
-    box-shadow: 0 18px 48px rgba(84, 38, 62, 0.08);
-    backdrop-filter: blur(18px);
+    box-shadow: var(--yan-shadow);
   }
 
   .yan-panel-strong {
-    border: 1px solid rgba(255, 255, 255, 0.82);
+    border: 1px solid var(--yan-border);
     background: var(--yan-panel-strong);
-    box-shadow: 0 22px 60px rgba(84, 38, 62, 0.1);
-    backdrop-filter: blur(20px);
+    box-shadow: var(--yan-shadow);
   }
 
   .yan-gradient {
     background:
-      linear-gradient(135deg, rgba(255, 255, 255, 0.24), transparent 42%),
-      linear-gradient(135deg, #2d1d26, #9a5877 52%, #e7758f);
+      linear-gradient(135deg, rgba(255, 255, 255, 0.18), transparent 42%),
+      linear-gradient(135deg, #2a1822, #9a5877 58%, #e7758f);
   }
 
   .yan-mark-gradient {
@@ -171,9 +168,23 @@
 
   .yan-soft-grid {
     background-image:
-      linear-gradient(rgba(42, 24, 34, 0.055) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(42, 24, 34, 0.055) 1px, transparent 1px);
-    background-size: 42px 42px;
+      linear-gradient(rgba(42, 24, 34, 0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(42, 24, 34, 0.04) 1px, transparent 1px);
+    background-size: 44px 44px;
+  }
+
+  .yan-page {
+    margin-inline: auto;
+    width: 100%;
+    max-width: 1440px;
+  }
+
+  .yan-section-title {
+    color: var(--yan-ink);
+    font-size: 1.375rem;
+    font-weight: 650;
+    line-height: 1.25;
+    letter-spacing: 0;
   }
 
   .hide-scrollbar {

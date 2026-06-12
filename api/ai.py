@@ -40,6 +40,13 @@ class ChatCompletionRequest(BaseModel):
     messages: list[dict[str, object]] | None = None
 
 
+class PromptAssistantRequest(BaseModel):
+    goal: str = Field(..., min_length=1, max_length=2000)
+    style: str = Field(default="", max_length=120)
+    mode: str = Field(default="generate", max_length=40)
+    size: str = Field(default="", max_length=40)
+
+
 class ResponseCreateRequest(BaseModel):
     model_config = ConfigDict(extra="allow")
     model: str | None = None
@@ -277,6 +284,54 @@ def create_router() -> APIRouter:
         payload["request_id"] = request_id
         call = LoggedCall(identity, "/v1/chat/completions", model, "文本生成", request_id=request_id)
         return await call.run(openai_v1_chat_complete.handle, payload)
+
+    @router.post("/api/me/prompt-assistant")
+    async def create_prompt_assistant_result(
+            body: PromptAssistantRequest,
+            request: Request,
+            authorization: str | None = Header(default=None),
+    ):
+        identity = require_identity(authorization)
+        if identity.get("role") != "user":
+            raise HTTPException(status_code=403, detail={"error": "user permission required"})
+        request_id = request_id_from_request(request)
+        mode_label = "图生图" if body.mode == "edit" else "文生图"
+        payload = {
+            "model": "auto",
+            "stream": False,
+            "messages": [
+                {
+                    "role": "system",
+                    "content": (
+                        "你是颜值AI的商业摄影提示词助手。只输出可直接用于图片生成的一段中文提示词，"
+                        "不要解释，不要寒暄。提示词需要包含主体、场景、光线、构图、质感、镜头语言、商业用途和负面约束。"
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": (
+                        f"创作模式：{mode_label}\n"
+                        f"目标比例：{body.size or '未指定'}\n"
+                        f"风格偏好：{body.style or '高级商业视觉'}\n"
+                        f"用户需求：{body.goal.strip()}"
+                    ),
+                },
+            ],
+            "request_id": request_id,
+        }
+        call = LoggedCall(identity, "/api/me/prompt-assistant", "auto", "提示词助手", request_id=request_id)
+        result = await call.run(openai_v1_chat_complete.handle, payload)
+        content = ""
+        if isinstance(result, dict):
+            choices = result.get("choices")
+            first = choices[0] if isinstance(choices, list) and choices else {}
+            if isinstance(first, dict):
+                message = first.get("message")
+                if isinstance(message, dict):
+                    content = str(message.get("content") or "").strip()
+        if not content:
+            raise HTTPException(status_code=502, detail={"error": "prompt assistant returned empty content"})
+        return {"prompt": content, "raw": result if isinstance(result, dict) else None}
 
     @router.post("/v1/responses")
     async def create_response(

@@ -37,5 +37,23 @@
   "image_model_mappings": {
     "gpt-image-2": "gpt-5-5",
     "codex-gpt-image-2": "codex-gpt-image-2"
+  },
+  "billing": {
+    "settings": {
+      "enabled": false,
+      "gateway_url": "https://pay.gggua.com",
+      "pid": "",
+      "key": "",
+      "payment_type": "alipay",
+      "notify_url": "https://api.your-site.com/api/payment/easypay/notify",
+      "frontend_url": "https://www.your-site.com",
+      "return_url": "",
+      "support_url": ""
+    },
+    "plans": [
+      {"id": "starter-100", "label": "100 点", "quota": 100, "price": "9.90", "enabled": true},
+      {"id": "standard-500", "label": "500 点", "quota": 500, "price": "39.90", "enabled": true},
+      {"id": "pro-1500", "label": "1500 点", "quota": 1500, "price": "99.90", "enabled": true}
+    ]
   }
 }

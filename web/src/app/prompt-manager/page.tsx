@@ -4,12 +4,14 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } f
 import {
   CheckCircle2,
   Copy,
+  Bot,
   ImagePlus,
   LoaderCircle,
   Pencil,
   Plus,
   RefreshCw,
   Search,
+  Send,
   Share2,
   Trash2,
   Upload,
@@ -33,6 +35,7 @@ import {
   fetchAdminPrompts,
   fetchMyPrompts,
   fetchPromptShare,
+  generatePromptWithAssistant,
   importPromptShare,
   type PromptLibraryItem,
   type PromptLibraryPayload,
@@ -200,6 +203,10 @@ function PromptManagerContent({ session }: { session: StoredAuthSession }) {
   const [sharePreview, setSharePreview] = useState<PromptLibraryItem | null>(null);
   const [editingItem, setEditingItem] = useState<PromptLibraryItem | null>(null);
   const [form, setForm] = useState<PromptFormState>(emptyForm);
+  const [assistantGoal, setAssistantGoal] = useState("");
+  const [assistantStyle, setAssistantStyle] = useState("");
+  const [assistantResult, setAssistantResult] = useState("");
+  const [isAssistantLoading, setIsAssistantLoading] = useState(false);
   const uploadInputRef = useRef<HTMLInputElement>(null);
 
   const categories = useMemo(() => {
@@ -392,6 +399,50 @@ function PromptManagerContent({ session }: { session: StoredAuthSession }) {
     }
   };
 
+  const handleAssistantGenerate = async () => {
+    const goal = assistantGoal.trim();
+    if (!goal) {
+      toast.error("请先描述你想生成的图片");
+      return;
+    }
+    setIsAssistantLoading(true);
+    try {
+      const data = await generatePromptWithAssistant({
+        goal,
+        style: assistantStyle.trim(),
+        mode: "generate",
+      });
+      setAssistantResult(data.prompt);
+      toast.success("提示词已生成");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "生成提示词失败");
+    } finally {
+      setIsAssistantLoading(false);
+    }
+  };
+
+  const useAssistantResult = () => {
+    if (!assistantResult.trim()) {
+      return;
+    }
+    setEditingItem(null);
+    setForm({
+      ...emptyForm,
+      title: assistantGoal.trim().slice(0, 32) || "AI 生成提示词",
+      description: assistantStyle.trim(),
+      prompt: assistantResult.trim(),
+    });
+    setDialogOpen(true);
+  };
+
+  const copyAssistantResult = async () => {
+    if (!assistantResult.trim()) {
+      return;
+    }
+    await navigator.clipboard.writeText(assistantResult);
+    toast.success("提示词已复制");
+  };
+
   const handleApprove = async (item: PromptLibraryItem) => {
     try {
       const data = await approveAdminPrompt(item.id);
@@ -464,6 +515,66 @@ function PromptManagerContent({ session }: { session: StoredAuthSession }) {
           </Button>
         </div>
       </div>
+
+      {!isAdmin ? (
+        <div className="rounded-lg border border-rose-100 bg-white p-4 shadow-sm">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 text-sm font-semibold text-stone-900">
+                <Bot className="size-4 text-rose-500" />
+                提示词助手
+              </div>
+              <p className="mt-1 text-sm text-stone-500">描述你要的画面，免费生成可直接用于创作台的商业提示词。</p>
+            </div>
+            <Button onClick={() => void handleAssistantGenerate()} disabled={isAssistantLoading || !assistantGoal.trim()} className="h-10 rounded-xl bg-rose-500 px-4 text-white hover:bg-rose-600">
+              {isAssistantLoading ? <LoaderCircle className="size-4 animate-spin" /> : <Send className="size-4" />}
+              生成提示词
+            </Button>
+          </div>
+          <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_220px]">
+            <label className="block space-y-1.5">
+              <span className="text-xs font-medium text-stone-500">画面需求</span>
+              <Textarea
+                value={assistantGoal}
+                onChange={(event) => setAssistantGoal(event.target.value)}
+                placeholder="例如：给一款高端护肤精华做电商主图，背景干净，有水润质感和高级光影"
+                className="min-h-[112px] resize-y rounded-xl border-stone-200 bg-stone-50 text-sm leading-6"
+              />
+            </label>
+            <label className="block space-y-1.5">
+              <span className="text-xs font-medium text-stone-500">风格偏好</span>
+              <Input
+                value={assistantStyle}
+                onChange={(event) => setAssistantStyle(event.target.value)}
+                placeholder="高端、清透、胶片等"
+                className="h-10 rounded-xl border-stone-200 bg-stone-50"
+              />
+            </label>
+          </div>
+          {isAssistantLoading ? (
+            <div className="mt-4 rounded-lg border border-stone-200 bg-stone-50 p-4 text-sm text-stone-500">
+              <LoaderCircle className="mr-2 inline size-4 animate-spin text-rose-500" />
+              正在整理主体、光线、构图和商业用途...
+            </div>
+          ) : null}
+          {assistantResult ? (
+            <div className="mt-4 rounded-lg border border-stone-200 bg-stone-50 p-4">
+              <div className="mb-2 text-xs font-medium text-stone-500">生成结果</div>
+              <p className="whitespace-pre-wrap text-sm leading-6 text-stone-700">{assistantResult}</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Button type="button" variant="outline" onClick={() => void copyAssistantResult()} className="h-9 rounded-xl border-stone-200 bg-white px-3 text-stone-700">
+                  <Copy className="size-4" />
+                  复制
+                </Button>
+                <Button type="button" onClick={useAssistantResult} className="h-9 rounded-xl bg-stone-950 px-3 text-white hover:bg-stone-800">
+                  <Plus className="size-4" />
+                  存为我的提示词
+                </Button>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="yan-panel flex flex-col gap-3 rounded-lg p-4">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">

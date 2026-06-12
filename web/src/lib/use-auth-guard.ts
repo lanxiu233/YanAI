@@ -34,7 +34,7 @@ export function useAuthGuard(allowedRoles?: AuthRole[]): UseAuthGuardResult {
       if (!storedSession) {
         setSession(null);
         setIsCheckingAuth(false);
-        router.replace("/login");
+        router.replace(roleList.length === 1 && roleList[0] === "admin" ? "/admin-login" : "/login");
         return;
       }
 

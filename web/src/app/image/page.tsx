@@ -32,7 +32,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { editImage, fetchAccounts, fetchMe, generateImage, type Account } from "@/lib/api";
+import { editImage, fetchMe, generateImage } from "@/lib/api";
 import { useAuthGuard } from "@/lib/use-auth-guard";
 import {
   clearImageConversations,
@@ -87,11 +87,6 @@ function formatConversationTime(value: string) {
     hour: "2-digit",
     minute: "2-digit",
   }).format(date);
-}
-
-function formatAvailableQuota(accounts: Account[]) {
-  const availableAccounts = accounts.filter((account) => account.status !== "禁用");
-  return String(availableAccounts.reduce((sum, account) => sum + Math.max(0, account.quota), 0));
 }
 
 function createId() {
@@ -308,7 +303,6 @@ function ImagePageContent({ session }: { session: StoredAuthSession }) {
   const [composerPanelWidth, setComposerPanelWidth] = useState(COMPOSER_PANEL_DEFAULT_WIDTH);
   const [isComposerPanelResizing, setIsComposerPanelResizing] = useState(false);
 
-  const isAdmin = session.role === "admin";
   const imageConversationOwnerKey = useMemo(() => getImageConversationOwnerKey(session), [session]);
   const activeConversationStorageKey = useMemo(
     () => getScopedStorageKey(ACTIVE_CONVERSATION_STORAGE_KEY, imageConversationOwnerKey),
@@ -528,22 +522,13 @@ function ImagePageContent({ session }: { session: StoredAuthSession }) {
   }, [activeConversationStorageKey, imageConversationOwnerKey, imageSizeStorageKey]);
 
   const loadQuota = useCallback(async () => {
-    if (!isAdmin) {
-      try {
-        const data = await fetchMe();
-        setAvailableQuota(String(data.user.quota ?? 0));
-      } catch {
-        setAvailableQuota("--");
-      }
-      return;
-    }
     try {
-      const data = await fetchAccounts();
-      setAvailableQuota(formatAvailableQuota(data.items));
+      const data = await fetchMe();
+      setAvailableQuota(String(data.user.quota ?? 0));
     } catch {
-      setAvailableQuota((prev) => (prev === "加载中..." ? "--" : prev));
+      setAvailableQuota("--");
     }
-  }, [isAdmin]);
+  }, []);
 
   useEffect(() => {
     if (didLoadQuotaRef.current) {
@@ -560,7 +545,7 @@ function ImagePageContent({ session }: { session: StoredAuthSession }) {
     return () => {
       window.removeEventListener("focus", handleFocus);
     };
-  }, [isAdmin, loadQuota]);
+  }, [loadQuota]);
 
   useEffect(() => {
     if (!selectedConversation) {
@@ -1185,20 +1170,19 @@ function ImagePageContent({ session }: { session: StoredAuthSession }) {
             </Button>
           </div>
 
-          <header className="yan-panel relative overflow-hidden rounded-lg px-4 py-4">
-            <div className="absolute -right-12 -top-16 h-36 w-36 rounded-full bg-rose-300/25 blur-3xl" />
-            <div className="relative flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <header className="yan-panel relative overflow-hidden rounded-lg px-4 py-3">
+            <div className="relative flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <div className="min-w-0 flex-1">
                 <div className="inline-flex items-center gap-2 rounded-full bg-white/70 px-3 py-1 text-xs font-semibold text-rose-600">
                   <Sparkles className="size-3.5" />
                   颜值AI Studio
                 </div>
-                <h1 className="mt-3 text-2xl font-black tracking-tight text-stone-950 text-balance sm:text-3xl">月光影像创作台</h1>
+                <h1 className="mt-2 text-xl font-bold tracking-tight text-stone-950 text-balance sm:text-2xl">月光影像创作台</h1>
                 <p className="mt-1 max-w-[42rem] text-sm leading-6 text-stone-500">
                   选模板或输入提示词 · 上传参考图 · 生成后继续编辑
                 </p>
               </div>
-              <div className="grid w-full grid-cols-3 gap-2 text-center text-xs md:w-auto md:min-w-[260px]">
+              <div className="hidden w-full grid-cols-3 gap-2 text-center text-xs md:w-auto md:min-w-[260px]">
                 {[
                   ["1", "选模板"],
                   ["2", imageMode === "edit" ? "放参考图" : "写描述"],
@@ -1221,6 +1205,13 @@ function ImagePageContent({ session }: { session: StoredAuthSession }) {
               </label>
             </div>
           </header>
+
+          {conversations.length === 0 ? (
+            <div className="rounded-lg border border-rose-100 bg-white px-4 py-3 text-sm text-stone-600 shadow-sm">
+              <span className="font-semibold text-stone-900">新用户启动：</span>
+              先选一个模板，写清主体和用途，生成第一张图后可以在结果里继续编辑。额度充值已收进个人中心。
+            </div>
+          ) : null}
 
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 2xl:grid-cols-4">
             <WorkspaceMetric label="今日生成" value={workspaceStats.todayGenerated} />
@@ -1387,7 +1378,7 @@ function WorkspaceMetric({ label, value }: { label: string; value: string | numb
 }
 
 export default function ImagePage() {
-  const { isCheckingAuth, session } = useAuthGuard();
+  const { isCheckingAuth, session } = useAuthGuard(["user"]);
 
   if (isCheckingAuth || !session) {
     return (

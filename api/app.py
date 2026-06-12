@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from api import accounts, ai, prompts, register, system, users
+from api import accounts, ai, billing, prompts, register, system, users
 from api.support import resolve_web_asset, start_limited_account_watcher, start_quota_reservation_watcher
 from services.config import config
 from services.observability import normalize_request_id, request_id_context
@@ -49,6 +49,7 @@ def create_app() -> FastAPI:
 
     app.include_router(ai.create_router())
     app.include_router(accounts.create_router())
+    app.include_router(billing.create_router())
     app.include_router(prompts.create_router())
     app.include_router(register.create_router())
     app.include_router(users.create_router())

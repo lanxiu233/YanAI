@@ -13,6 +13,29 @@ type ErrorPayload = {
     message?: string;
 };
 
+const adminRoutePrefixes = [
+    "/users",
+    "/accounts",
+    "/register",
+    "/image-manager",
+    "/channels",
+    "/models",
+    "/redeem-codes",
+    "/logs",
+    "/settings",
+    "/admin-login",
+];
+
+function getUnauthorizedRedirectPath() {
+    if (typeof window === "undefined") {
+        return "/login";
+    }
+    const pathname = window.location.pathname;
+    return adminRoutePrefixes.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))
+        ? "/admin-login"
+        : "/login";
+}
+
 function errorMessageFromValue(value: unknown): string {
     if (typeof value === "string") {
         return value;
@@ -51,10 +74,10 @@ request.interceptors.response.use(
         const status = error.response?.status;
         const shouldRedirect = (error.config as RequestConfig | undefined)?.redirectOnUnauthorized !== false;
         if (status === 401 && shouldRedirect && typeof window !== "undefined") {
-            // Avoid redirect loop — only redirect if not already on /login
-            if (!window.location.pathname.startsWith("/login")) {
+            const redirectPath = getUnauthorizedRedirectPath();
+            if (!window.location.pathname.startsWith(redirectPath)) {
                 await clearStoredAuthSession();
-                window.location.replace("/login");
+                window.location.replace(redirectPath);
                 // Return a never-resolving promise to prevent further error handling
                 // while the browser navigates away
                 return new Promise(() => {});

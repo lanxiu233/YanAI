@@ -16,6 +16,7 @@ import {
   Menu,
   PenLine,
   Settings,
+  ShieldCheck,
   Sparkles,
   User,
   Users,
@@ -45,14 +46,13 @@ type NavItem = {
 };
 
 const adminNavItems = [
-  { href: "/image", label: "画图", icon: Sparkles },
   { href: "/users", label: "用户管理", icon: Users },
-  { href: "/accounts", label: "账号池管理", icon: Boxes },
+  { href: "/accounts", label: "号池管理", icon: Boxes },
   { href: "/register", label: "注册机", icon: KeyRound },
-  { href: "/prompt-manager", label: "提示词管理", icon: PenLine },
+  { href: "/prompt-manager", label: "提示词审核", icon: PenLine },
   { href: "/image-manager", label: "图片管理", icon: Images },
-  { href: "/channels", label: "渠道管理", icon: Waypoints },
-  { href: "/models", label: "模型管理", icon: BadgeDollarSign },
+  { href: "/channels", label: "渠道", icon: Waypoints },
+  { href: "/models", label: "模型", icon: BadgeDollarSign },
   { href: "/redeem-codes", label: "兑换码", icon: Gift },
   { href: "/logs", label: "日志", icon: FileText },
   { href: "/settings", label: "设置", icon: Settings },
@@ -98,7 +98,7 @@ export function TopNav() {
     let active = true;
 
     const load = async () => {
-      if (pathname === "/login" || pathname === "/signup") {
+      if (pathname === "/login" || pathname === "/signup" || pathname === "/admin-login") {
         if (active) setSession(null);
         return;
       }
@@ -125,7 +125,9 @@ export function TopNav() {
     let active = true;
 
     if (!session) {
-      setAnnouncement(null);
+      queueMicrotask(() => {
+        if (active) setAnnouncement(null);
+      });
       return () => {
         active = false;
       };
@@ -175,49 +177,70 @@ export function TopNav() {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.clearInterval(intervalId);
     };
-  }, [pathname, session?.key]);
+  }, [session?.key]);
+
+  useEffect(() => {
+    if (!session) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      const items = session.role === "admin" ? adminNavItems : userNavItems;
+      items.forEach((item) => {
+        if (item.href !== pathname) {
+          router.prefetch(item.href);
+        }
+      });
+    }, 250);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [pathname, router, session?.role]);
 
   const handleLogout = async () => {
+    const nextPath = session?.role === "admin" ? "/admin-login" : "/login";
     await clearStoredAuthSession();
-    router.replace("/login");
+    router.replace(nextPath);
   };
 
-  if (pathname === "/login" || pathname === "/signup" || session === undefined || !session) {
+  if (pathname === "/login" || pathname === "/signup" || pathname === "/admin-login" || session === undefined || !session) {
     return null;
   }
 
-  const navItems = session.role === "admin" ? adminNavItems : userNavItems;
-  const roleLabel = session.role === "admin" ? "管理员" : "个人用户";
+  const isAdmin = session.role === "admin";
+  const navItems = isAdmin ? adminNavItems : userNavItems;
+  const roleLabel = isAdmin ? "管理员" : "个人用户";
+  const workspaceLabel = isAdmin ? "控制台" : "创作空间";
+  const homeHref = isAdmin ? "/users" : "/image";
   const currentNavItem = navItems.find((item) => pathname === item.href) ?? navItems[0];
   const CurrentIcon = currentNavItem.icon;
   const hasAnnouncement = Boolean(announcement?.enabled && (announcement.title || announcement.content));
   const announcementTime = formatAnnouncementTime(announcement?.updated_at);
 
   return (
-    <header className="border-b border-rose-100/80 bg-white/58 backdrop-blur-xl">
-      <div className="flex min-h-[4.25rem] items-center justify-between gap-2 px-2.5 sm:min-h-16 sm:gap-3 sm:px-5">
-        <Link href="/image" className="group flex shrink-0 items-center gap-2.5 whitespace-nowrap">
-          <span className="yan-mark-gradient grid size-10 place-items-center rounded-lg text-sm font-black text-white shadow-[0_14px_30px_rgba(243,111,159,0.22)] transition group-hover:brightness-105">
+    <header className="sticky top-0 z-30 border-b border-stone-200 bg-white/95">
+      <div className="flex min-h-[4.25rem] items-center justify-between gap-2 px-3 sm:min-h-16 sm:gap-3 sm:px-5 lg:px-6">
+        <Link href={homeHref} className="group flex shrink-0 items-center gap-2.5 whitespace-nowrap">
+          <span className="yan-mark-gradient grid size-10 place-items-center rounded-lg text-sm font-black text-white shadow-sm transition group-hover:brightness-105">
             颜
           </span>
           <span className="hidden leading-tight md:block">
             <span className="block text-[17px] font-bold tracking-tight text-stone-950">颜值AI</span>
-            <span className="block text-xs font-medium text-stone-500">Image Studio</span>
+            <span className="block text-xs font-medium text-stone-500">{workspaceLabel}</span>
           </span>
         </Link>
 
         <Link
           href={currentNavItem.href}
-          className="flex min-w-0 flex-1 items-center justify-center gap-2 rounded-xl border border-rose-100 bg-white/72 px-3 py-2 text-sm font-medium text-stone-900 shadow-[0_8px_24px_rgba(84,38,62,0.06)] sm:hidden"
+          className="flex min-w-0 flex-1 items-center justify-center gap-2 rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm font-medium text-stone-900 sm:hidden"
         >
           <CurrentIcon className="size-4 shrink-0 text-rose-500" />
           <span className="truncate">{currentNavItem.label}</span>
-          <span className="shrink-0 rounded-full bg-rose-50 px-2 py-0.5 text-[11px] font-medium text-rose-600">
-            {roleLabel}
+          <span className="shrink-0 rounded-md bg-stone-100 px-2 py-0.5 text-[11px] font-medium text-stone-600">
+            {workspaceLabel}
           </span>
         </Link>
 
-        <nav className="hidden min-w-0 flex-1 justify-center gap-1.5 overflow-x-auto sm:flex sm:gap-2">
+        <nav className="hidden min-w-0 flex-1 justify-center gap-1 overflow-x-auto sm:flex">
           {navItems.map((item) => {
             const active = pathname === item.href;
             const Icon = item.icon;
@@ -228,8 +251,8 @@ export function TopNav() {
                 className={cn(
                   "relative inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-lg px-3 text-[13px] font-medium transition sm:text-sm",
                   active
-                    ? "bg-gradient-to-r from-rose-100 via-pink-50 to-fuchsia-50 text-stone-950 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.82)]"
-                    : "text-stone-500 hover:bg-white/62 hover:text-rose-700",
+                    ? "bg-stone-950 text-white"
+                    : "text-stone-500 hover:bg-stone-100 hover:text-stone-950",
                 )}
               >
                 <Icon className="size-4" />
@@ -240,7 +263,8 @@ export function TopNav() {
         </nav>
 
         <div className="flex shrink-0 items-center justify-end gap-1 sm:gap-2">
-          <span className="hidden rounded-lg border border-rose-100 bg-white/65 px-2.5 py-1 text-[11px] font-medium text-rose-600 md:inline-block">
+          <span className="hidden items-center gap-1.5 rounded-lg border border-stone-200 bg-white px-2.5 py-1 text-[11px] font-medium text-stone-600 md:inline-flex">
+            {isAdmin ? <ShieldCheck className="size-3.5" /> : <Sparkles className="size-3.5" />}
             {roleLabel}
           </span>
           <Popover
@@ -254,8 +278,8 @@ export function TopNav() {
               <button
                 type="button"
                 className={cn(
-                  "relative inline-flex size-10 items-center justify-center rounded-lg transition hover:bg-white/65 sm:size-9",
-                  hasAnnouncement ? "text-rose-600" : "text-stone-400 hover:text-rose-600",
+                  "relative inline-flex size-10 items-center justify-center rounded-lg transition hover:bg-stone-100 sm:size-9",
+                  hasAnnouncement ? "text-rose-600" : "text-stone-400 hover:text-stone-700",
                 )}
                 aria-label="查看通知"
               >
@@ -263,7 +287,7 @@ export function TopNav() {
                 {hasAnnouncement ? <span className="absolute right-2 top-2 size-2 rounded-full bg-rose-500 shadow-[0_0_0_3px_rgba(255,255,255,0.9)]" /> : null}
               </button>
             </PopoverTrigger>
-            <PopoverContent align="end" className="w-[min(22rem,calc(100vw-2rem))] space-y-3 rounded-2xl border-rose-100 bg-white/96 p-4">
+            <PopoverContent align="end" className="w-[min(22rem,calc(100vw-2rem))] space-y-3 rounded-lg border-stone-200 bg-white p-4">
               {hasAnnouncement && announcement ? (
                 <>
                   <div className="flex items-start justify-between gap-3">
@@ -291,15 +315,15 @@ export function TopNav() {
             <PopoverTrigger asChild>
               <button
                 type="button"
-                className="inline-flex size-10 items-center justify-center rounded-lg text-stone-500 transition hover:bg-white/65 hover:text-rose-600 sm:hidden"
+                className="inline-flex size-10 items-center justify-center rounded-lg text-stone-500 transition hover:bg-stone-100 hover:text-stone-950 sm:hidden"
                 aria-label="打开导航菜单"
               >
                 <Menu className="size-4" />
               </button>
             </PopoverTrigger>
-            <PopoverContent align="end" sideOffset={10} className="w-[min(20rem,calc(100vw-1rem))] rounded-2xl border-rose-100 bg-white/98 p-2 sm:hidden">
+            <PopoverContent align="end" sideOffset={10} className="w-[min(20rem,calc(100vw-1rem))] rounded-lg border-stone-200 bg-white p-2 sm:hidden">
               <div className="px-2 py-2">
-                <div className="text-xs font-medium text-stone-400">导航</div>
+                <div className="text-xs font-medium text-stone-400">{workspaceLabel}</div>
                 <div className="mt-1 flex items-center gap-2 text-sm font-semibold text-stone-950">
                   <span>{roleLabel}</span>
                   <span className="rounded-full bg-stone-100 px-2 py-0.5 text-[11px] font-medium text-stone-500">
@@ -318,7 +342,7 @@ export function TopNav() {
                       className={cn(
                         "flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-medium transition",
                         active
-                          ? "bg-rose-50 text-rose-700 shadow-[inset_0_0_0_1px_rgba(244,63,94,0.12)]"
+                          ? "bg-stone-950 text-white"
                           : "text-stone-600 hover:bg-stone-50 hover:text-stone-950",
                       )}
                     >
@@ -330,12 +354,12 @@ export function TopNav() {
               </div>
             </PopoverContent>
           </Popover>
-          <span className="hidden rounded-lg border border-rose-100 bg-white/65 px-2.5 py-1 text-[11px] font-medium text-stone-400 lg:inline-block">
+          <span className="hidden rounded-lg border border-stone-200 bg-white px-2.5 py-1 text-[11px] font-medium text-stone-400 lg:inline-block">
             v{webConfig.appVersion}
           </span>
           <button
             type="button"
-            className="inline-flex size-10 items-center justify-center rounded-lg text-stone-400 transition hover:bg-white/65 hover:text-rose-600 sm:size-9"
+            className="inline-flex size-10 items-center justify-center rounded-lg text-stone-400 transition hover:bg-stone-100 hover:text-stone-950 sm:size-9"
             onClick={() => void handleLogout()}
             aria-label="退出登录"
           >

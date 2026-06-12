@@ -488,6 +488,14 @@ class ConfigStore:
         data["linuxdo_client_secret_set"] = bool(self.linuxdo_client_secret)
         data["image_model_mappings"] = self.image_model_mappings
         data["announcement"] = self.announcement
+        billing = data.get("billing")
+        if isinstance(billing, dict):
+            billing_copy = dict(billing)
+            settings = dict(billing_copy.get("settings") or {})
+            key_value = str(settings.pop("key", "") or "").strip()
+            settings["key_set"] = bool(key_value)
+            billing_copy["settings"] = settings
+            data["billing"] = billing_copy
         data.pop("auth-key", None)
         data.pop("smtp_password", None)
         data.pop("linuxdo_client_secret", None)
