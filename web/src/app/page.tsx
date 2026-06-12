@@ -350,7 +350,7 @@ function HomePageInner() {
 
                 {registerOptions?.linuxdo_oauth_enabled ? (
                   <Button type="button" variant="outline" className="h-11 w-full rounded-xl border-stone-200 bg-white text-stone-800 hover:bg-stone-50" onClick={startLinuxDoOAuth}>
-                    使用 Linux DO 登录
+                    使用 Linux DO 登录/注册
                   </Button>
                 ) : null}
               </form>
@@ -398,6 +398,12 @@ function HomePageInner() {
                   {isSubmitting ? <LoaderCircle className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
                   注册并进入创作台
                 </Button>
+
+                {registerOptions?.linuxdo_oauth_enabled ? (
+                  <Button type="button" variant="outline" className="h-11 w-full rounded-xl border-stone-200 bg-white text-stone-800 hover:bg-stone-50" onClick={startLinuxDoOAuth}>
+                    使用 Linux DO 登录/注册
+                  </Button>
+                ) : null}
               </form>
             )}
           </div>
