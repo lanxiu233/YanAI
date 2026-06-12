@@ -34,7 +34,13 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { createPromptShare, fetchPromptLibrary, type PromptLibraryItem, type PromptLibraryPayload } from "@/lib/api";
+import {
+  createPromptShare,
+  fetchPromptLibrary,
+  generatePromptWithAssistant,
+  type PromptLibraryItem,
+  type PromptLibraryPayload,
+} from "@/lib/api";
 import { resolveApiAssetUrl } from "@/lib/assets";
 import type { ImageConversationMode } from "@/store/image-conversations";
 import { cn } from "@/lib/utils";
@@ -537,12 +543,18 @@ const defaultPromptIconById: Record<string, string> = {
   "detail-restore": "wand-sparkles",
 };
 
+const defaultPromptPreviewById: Record<string, string> = {
+  "photo-portrait-v1": "/banana-prompt-quicker/images/fashion_portrait_collage.jpg",
+  "photo-portrait-v2": "/banana-prompt-quicker/images/film_portrait.jpg",
+};
+
 const defaultPromptItems: PromptPickerItem[] = promptPresetOptions.map((preset, index) => ({
   id: preset.id,
   title: preset.title,
   description: preset.description,
   prompt: preset.prompt,
   mode: preset.mode,
+  preview: defaultPromptPreviewById[preset.id] || "",
   image_size: preset.imageSize || "",
   image_count: preset.imageCount || "",
   icon: defaultPromptIconById[preset.id],
@@ -591,9 +603,13 @@ function getPromptCategoryLabel(item: PromptPickerItem) {
 }
 
 function getBananaPromptPreviewUrl(item: PromptPickerItem) {
-  const candidate = item.preview || item.reference_image_urls?.[0];
+  const fallbackPreview = item.id ? defaultPromptPreviewById[item.id] : "";
+  const candidate = item.preview || item.reference_image_urls?.[0] || fallbackPreview;
   if (!candidate) {
     return "";
+  }
+  if (item.id === "photo-portrait-v1" && candidate.startsWith("/prompt-assets/")) {
+    return fallbackPreview;
   }
   if (candidate.startsWith("/")) {
     return resolveApiAssetUrl(candidate);
@@ -730,7 +746,6 @@ type ImageComposerProps = {
   prompt: string;
   imageCount: string;
   imageSize: string;
-  availableQuota: string;
   activeTaskCount: number;
   referenceImages: Array<{ name: string; dataUrl: string }>;
   textareaRef: RefObject<HTMLTextAreaElement | null>;
@@ -750,7 +765,6 @@ export function ImageComposer({
   prompt,
   imageCount,
   imageSize,
-  availableQuota,
   activeTaskCount,
   referenceImages,
   textareaRef,
@@ -775,6 +789,7 @@ export function ImageComposer({
   const [bananaPromptCategory, setBananaPromptCategory] = useState("全部");
   const [bananaPromptRetryKey, setBananaPromptRetryKey] = useState(0);
   const [favoritePromptIds, setFavoritePromptIds] = useState<string[]>([]);
+  const [isPolishingPrompt, setIsPolishingPrompt] = useState(false);
   const sizeMenuRef = useRef<HTMLDivElement>(null);
   const lightboxImages = useMemo(
     () => referenceImages.map((image, index) => ({ id: `${image.name}-${index}`, src: image.dataUrl })),
@@ -814,6 +829,7 @@ export function ImageComposer({
     { value: "9:16", label: "9:16 (竖版)" },
   ];
   const imageSizeLabel = imageSizeOptions.find((option) => option.value === imageSize)?.label || "未指定";
+  const requiredQuota = Math.max(1, Math.min(10, Number(imageCount) || 1));
   const favoritePromptIdSet = useMemo(() => new Set(favoritePromptIds), [favoritePromptIds]);
   const quickPromptItems = useMemo(() => {
     const favoriteItems = sortPromptItems(bananaPrompts.filter((item) => favoritePromptIdSet.has(getPromptIdentityKey(item))));
@@ -907,6 +923,30 @@ export function ImageComposer({
     }
   };
 
+  const handlePolishPrompt = async () => {
+    const cleaned = prompt.trim();
+    if (!cleaned) {
+      toast.error("先写一句想要的画面");
+      return;
+    }
+    setIsPolishingPrompt(true);
+    try {
+      const data = await generatePromptWithAssistant({
+        goal: cleaned,
+        style: "保留用户原意，补充主体、构图、光线、材质、风格和避免项，输出一段可直接用于生图的中文提示词，不要解释。",
+        mode,
+        size: imageSize,
+      });
+      onPromptChange(data.prompt);
+      toast.success("已润色提示词");
+      window.requestAnimationFrame(() => textareaRef.current?.focus());
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "润色失败，请稍后重试");
+    } finally {
+      setIsPolishingPrompt(false);
+    }
+  };
+
   useEffect(() => {
     const controller = new AbortController();
     const loadBananaPrompts = async () => {
@@ -985,8 +1025,8 @@ export function ImageComposer({
       <div className="border-b border-rose-100/70 px-4 py-4">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <div className="text-base font-bold text-stone-950">创作参数</div>
-            <div className="mt-1 text-sm text-stone-500">模板 · 参考图 · 比例 · 张数</div>
+            <div className="text-base font-bold text-stone-950">创作面板</div>
+            <div className="mt-1 text-sm text-stone-500">方向、画面和输出比例</div>
           </div>
           <div className="rounded-full bg-white/70 px-3 py-1 text-xs font-semibold text-rose-600">
             {mode === "edit" ? "图生图" : "文生图"}
@@ -1019,16 +1059,16 @@ export function ImageComposer({
 
         <div className="mb-4 grid grid-cols-2 gap-3 rounded-lg bg-white/45 p-3">
           <div>
-            <div className="text-xs text-stone-500">模型</div>
-            <div className="mt-1 text-sm font-bold text-stone-950">gpt-image-2</div>
+            <div className="text-xs text-stone-500">模式</div>
+            <div className="mt-1 text-sm font-bold text-stone-950">{mode === "edit" ? "图生图" : "文生图"}</div>
           </div>
           <div>
             <div className="text-xs text-stone-500">生成张数</div>
-            <div className="mt-1 text-sm font-bold text-stone-950">{Math.max(1, Math.min(10, Number(imageCount) || 1))} / 最多 10</div>
+            <div className="mt-1 text-sm font-bold text-stone-950">{requiredQuota} / 最多 10</div>
           </div>
           <div>
-            <div className="text-xs text-stone-500">剩余额度</div>
-            <div className="mt-1 text-sm font-bold text-stone-950">{availableQuota}</div>
+            <div className="text-xs text-stone-500">本次消耗</div>
+            <div className="mt-1 text-sm font-bold text-stone-950">{requiredQuota} 点额度</div>
           </div>
           <div>
             <div className="text-xs text-stone-500">活动任务</div>
@@ -1336,9 +1376,24 @@ export function ImageComposer({
 
         <div className="yan-panel-strong overflow-hidden rounded-lg">
           <div className="border-b border-rose-100/70 px-4 py-3">
-            <div className="text-sm font-bold text-stone-950">第 2 步：描述你要的画面</div>
-            <div className="mt-1 text-xs text-stone-500">
-              {mode === "edit" ? "上传参考图后，说明要保留什么、改变什么。" : "可以直接输入，也可以先从上方模板开始。"}
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-sm font-bold text-stone-950">画面描述</div>
+                <div className="mt-1 text-xs text-stone-500">
+                  {mode === "edit" ? "说清保留和改变的部分。" : "可以直接写，也可以从左侧方向开始。"}
+                </div>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => void handlePolishPrompt()}
+                disabled={!prompt.trim() || isPolishingPrompt}
+                className="h-8 shrink-0 rounded-lg border-rose-100 bg-white px-2.5 text-stone-700"
+              >
+                {isPolishingPrompt ? <LoaderCircle className="size-4 animate-spin" /> : <WandSparkles className="size-4" />}
+                润色一下
+              </Button>
             </div>
           </div>
           <div
@@ -1386,7 +1441,7 @@ export function ImageComposer({
                     </Button>
                   )}
                   <div className="inline-flex h-10 items-center justify-center rounded-lg bg-rose-50 px-3 text-xs font-medium text-stone-600 lg:h-9">
-                    <span className="mr-1">额度</span>{availableQuota}
+                    <span className="mr-1">本次</span>{requiredQuota} 点
                   </div>
                   {activeTaskCount > 0 && (
                     <div className="col-span-2 flex h-10 items-center justify-center gap-1.5 rounded-lg bg-amber-50 px-3 text-xs font-medium text-amber-700 lg:h-9">

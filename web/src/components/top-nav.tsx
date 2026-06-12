@@ -93,6 +93,8 @@ export function TopNav() {
   const [session, setSession] = useState<StoredAuthSession | null | undefined>(undefined);
   const [announcement, setAnnouncement] = useState<AnnouncementConfig | null>(null);
   const [announcementOpen, setAnnouncementOpen] = useState(false);
+  const sessionKey = session?.key;
+  const sessionRole = session?.role;
 
   useEffect(() => {
     let active = true;
@@ -124,7 +126,7 @@ export function TopNav() {
   useEffect(() => {
     let active = true;
 
-    if (!session) {
+    if (!sessionKey) {
       queueMicrotask(() => {
         if (active) setAnnouncement(null);
       });
@@ -177,15 +179,15 @@ export function TopNav() {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.clearInterval(intervalId);
     };
-  }, [session?.key]);
+  }, [sessionKey]);
 
   useEffect(() => {
-    if (!session) {
+    if (!sessionRole) {
       return;
     }
 
     const timeoutId = window.setTimeout(() => {
-      const items = session.role === "admin" ? adminNavItems : userNavItems;
+      const items = sessionRole === "admin" ? adminNavItems : userNavItems;
       items.forEach((item) => {
         if (item.href !== pathname) {
           router.prefetch(item.href);
@@ -194,7 +196,7 @@ export function TopNav() {
     }, 250);
 
     return () => window.clearTimeout(timeoutId);
-  }, [pathname, router, session?.role]);
+  }, [pathname, router, sessionRole]);
 
   const handleLogout = async () => {
     const nextPath = session?.role === "admin" ? "/admin-login" : "/login";
@@ -306,7 +308,7 @@ export function TopNav() {
               ) : (
                 <div className="space-y-1 text-sm leading-6">
                   <h2 className="font-semibold text-stone-900">暂无公告</h2>
-                  <p className="text-stone-500">管理员发布公告后会显示在这里。</p>
+                  <p className="text-stone-500">有新的站内消息时会显示在这里。</p>
                 </div>
               )}
             </PopoverContent>

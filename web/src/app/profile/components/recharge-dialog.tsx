@@ -51,14 +51,14 @@ export function RechargeDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="w-[min(94vw,720px)] max-w-none rounded-lg p-0">
+      <DialogContent className="max-h-[92vh] w-[min(94vw,720px)] max-w-none overflow-hidden rounded-lg p-0">
         <DialogHeader className="border-b border-stone-200 px-5 pt-5 pb-4 sm:px-6">
           <DialogTitle className="text-xl font-semibold text-stone-950">额度充值</DialogTitle>
           <DialogDescription className="text-stone-500">
-            套餐由管理员配置。支付成功后由易支付通知后端自动入账；兑换码仍在个人中心单独兑换。
+            套餐由平台统一配置。支付成功后会自动入账；兑换码仍在个人中心单独兑换。
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-5 px-5 py-5 sm:px-6">
+        <div className="max-h-[calc(92vh-106px)] space-y-5 overflow-y-auto px-5 py-5 sm:px-6">
           {!paymentEnabled ? (
             <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-900">
               {paymentDisabledReason || "易支付接口尚未配置完成，暂时不能在线充值。"}
@@ -72,27 +72,34 @@ export function RechargeDialog({
           <div className="grid gap-3 sm:grid-cols-3">
             {plans.map((plan) => {
               const pending = payingPlanId === plan.id;
+              const selected = selectedPlan?.id === plan.id;
               return (
                 <button
                   key={plan.id}
                   type="button"
                   disabled={!paymentEnabled || pending}
                   onClick={() => setSelectedPlan(plan)}
-                  className="min-h-[142px] rounded-lg border border-stone-200 bg-white p-4 text-left transition hover:border-rose-200 hover:bg-rose-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-200 disabled:cursor-not-allowed disabled:opacity-55"
+                  className={[
+                    "min-h-[142px] rounded-lg border p-4 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-200 disabled:cursor-not-allowed disabled:opacity-55",
+                    selected ? "border-rose-300 bg-rose-50 shadow-[0_14px_34px_rgba(244,63,94,0.12)]" : "border-stone-200 bg-white hover:border-rose-200 hover:bg-rose-50",
+                  ].join(" ")}
                 >
-                  <div className="text-sm font-medium text-stone-600">{plan.label}</div>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="text-sm font-medium text-stone-600">{plan.label}</div>
+                    {selected ? <Badge variant="default" className="rounded-md bg-rose-500 text-white">已选</Badge> : null}
+                  </div>
                   <div className="mt-2 text-2xl font-semibold text-stone-950">¥{plan.price}</div>
                   <div className="mt-3 text-xs text-stone-500">到账 {plan.quota} 点额度</div>
-                  <div className="mt-4 inline-flex h-9 items-center rounded-lg bg-stone-950 px-3 text-sm font-medium text-white">
+                  <div className={selected ? "mt-4 inline-flex h-9 items-center rounded-lg bg-rose-500 px-3 text-sm font-medium text-white" : "mt-4 inline-flex h-9 items-center rounded-lg bg-stone-950 px-3 text-sm font-medium text-white"}>
                     {pending ? <LoaderCircle className="mr-2 size-4 animate-spin" /> : <CreditCard className="mr-2 size-4" />}
-                    去结算
+                    {selected ? "确认套餐" : "选择套餐"}
                   </div>
                 </button>
               );
             })}
             {plans.length === 0 ? (
               <div className="rounded-lg border border-dashed border-stone-200 bg-stone-50 px-4 py-8 text-center text-sm text-stone-500 sm:col-span-3">
-                暂无可购买套餐，请联系管理员配置。
+                暂无可购买套餐，请联系支持。
               </div>
             ) : null}
           </div>

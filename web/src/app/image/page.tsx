@@ -10,12 +10,16 @@ import {
   useState,
 } from "react";
 import {
+  Camera,
+  IdCard,
   LoaderCircle,
   Menu,
   Plus,
   Search,
+  ShoppingBag,
   Sparkles,
   Trash2,
+  type LucideIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -63,6 +67,69 @@ const COMPOSER_GRID_LEFT_WIDTH = 300;
 const COMPOSER_GRID_GAP_WIDTH = 12;
 const COMPOSER_RESULTS_MIN_WIDTH = 520;
 const activeConversationQueueIds = new Set<string>();
+
+type StarterScene = {
+  id: string;
+  title: string;
+  tone: string;
+  meta: string;
+  icon: LucideIcon;
+  size: string;
+  count: string;
+  prompt: string;
+  visualClassName: string;
+};
+
+const STARTER_SCENES: StarterScene[] = [
+  {
+    id: "portrait",
+    title: "人像写真",
+    tone: "柔光 · 胶片 · 干净背景",
+    meta: "3:4",
+    icon: Camera,
+    size: "3:4",
+    count: "1",
+    visualClassName: "bg-[linear-gradient(135deg,#fff7f3_0%,#f8d7df_45%,#c7b7ff_100%)]",
+    prompt:
+      "真实摄影质感的年轻女性半身写真，自然自信，镜头直视，柔和侧光，干净浅色背景，皮肤保留真实纹理，发丝清晰，构图高级，轻微胶片颗粒，整体通透、安静、有气质，比例 3:4。",
+  },
+  {
+    id: "product",
+    title: "商品海报",
+    tone: "主图 · 光影 · 高级留白",
+    meta: "4:3",
+    icon: ShoppingBag,
+    size: "4:3",
+    count: "1",
+    visualClassName: "bg-[linear-gradient(135deg,#fbfbfb_0%,#e9f4f0_48%,#ffd6c9_100%)]",
+    prompt:
+      "为一款高端护肤精华生成电商主图，玻璃瓶身，干净浅色背景，水润质感，柔和反射，高级商业摄影布光，留白充足，产品清晰居中，适合详情页首图，比例 4:3。",
+  },
+  {
+    id: "avatar",
+    title: "风格头像",
+    tone: "清爽 · 识别度 · 可做头像",
+    meta: "1:1",
+    icon: Sparkles,
+    size: "1:1",
+    count: "1",
+    visualClassName: "bg-[linear-gradient(135deg,#f6f1ff_0%,#ffffff_42%,#ffd2de_100%)]",
+    prompt:
+      "生成一张适合作为社交头像的真实摄影风格人像，年轻女性，面部清晰，表情自然，背景简洁，有轻微艺术感但不过度夸张，肤色自然，五官真实，整体干净、有记忆点，比例 1:1。",
+  },
+  {
+    id: "profile",
+    title: "职业形象",
+    tone: "资料照 · 简洁 · 可信",
+    meta: "3:4",
+    icon: IdCard,
+    size: "3:4",
+    count: "1",
+    visualClassName: "bg-[linear-gradient(135deg,#ffffff_0%,#e8edf3_50%,#f6c9d6_100%)]",
+    prompt:
+      "真实摄影风格职业形象照，年轻女性，简洁上半身构图，自然微笑，干净背景，光线柔和，服装利落但不过度正式，适合个人主页、简历或商务资料使用，比例 3:4。",
+  },
+];
 
 function getScopedStorageKey(baseKey: string, ownerKey: string) {
   return ownerKey ? `${baseKey}:${ownerKey}` : baseKey;
@@ -649,6 +716,20 @@ function ImagePageContent({ session }: { session: StoredAuthSession }) {
     textareaRef.current?.focus();
   };
 
+  const handleStarterSceneSelect = (scene: StarterScene) => {
+    setSelectedConversationId(null);
+    setImageMode("generate");
+    setImagePrompt(scene.prompt);
+    setImageSize(scene.size);
+    setImageCount(scene.count);
+    setReferenceImageFiles([]);
+    setReferenceImages([]);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+    window.requestAnimationFrame(() => textareaRef.current?.focus());
+  };
+
   const handleDeleteConversation = async (id: string) => {
     const nextConversations = conversations.filter((item) => item.id !== id);
     conversationsRef.current = nextConversations;
@@ -755,7 +836,7 @@ function ImagePageContent({ session }: { session: StoredAuthSession }) {
   }, []);
 
   const handleContinueEdit = useCallback(
-    (conversationId: string, image: StoredImage | StoredReferenceImage) => {
+    (conversationId: string, image: StoredImage | StoredReferenceImage, promptDraft = "") => {
       const nextReferenceImage =
         "dataUrl" in image
           ? image
@@ -771,12 +852,36 @@ function ImagePageContent({ session }: { session: StoredAuthSession }) {
         ...prev,
         dataUrlToFile(nextReferenceImage.dataUrl, nextReferenceImage.name, nextReferenceImage.type),
       ]);
-      setImagePrompt("");
+      setImagePrompt(promptDraft);
       textareaRef.current?.focus();
       toast.success("已加入当前参考图，继续输入描述即可编辑");
     },
     [],
   );
+
+  const handleUsePromptDraft = useCallback((prompt: string, options: { mode?: string; size?: string; count?: string; referenceImages?: StoredReferenceImage[] } = {}) => {
+    const nextMode = options.mode === "edit" ? "edit" : "generate";
+    setImageMode(nextMode);
+    setImagePrompt(prompt);
+    setImageSize(options.size || "");
+    setImageCount(options.count || "1");
+    if (nextMode === "edit" && options.referenceImages?.length) {
+      setReferenceImages(options.referenceImages);
+      setReferenceImageFiles(
+        options.referenceImages.map((image, index) =>
+          dataUrlToFile(image.dataUrl, image.name || `reference-${index + 1}.png`, image.type),
+        ),
+      );
+    } else if (nextMode === "generate") {
+      setReferenceImageFiles([]);
+      setReferenceImages([]);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+    window.requestAnimationFrame(() => textareaRef.current?.focus());
+    toast.success(options.count === "1" ? "已改成 1 张，可重新生成" : "已放回创作面板");
+  }, []);
 
   const openLightbox = useCallback((images: ImageLightboxItem[], index: number) => {
     if (images.length === 0) {
@@ -1170,29 +1275,20 @@ function ImagePageContent({ session }: { session: StoredAuthSession }) {
             </Button>
           </div>
 
-          <header className="yan-panel relative overflow-hidden rounded-lg px-4 py-3">
-            <div className="relative flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <div className="min-w-0 flex-1">
-                <div className="inline-flex items-center gap-2 rounded-full bg-white/70 px-3 py-1 text-xs font-semibold text-rose-600">
-                  <Sparkles className="size-3.5" />
-                  颜值AI Studio
+          <header className="yan-panel rounded-lg px-4 py-3">
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="grid size-10 place-items-center rounded-lg bg-[#2d1d26] text-white">
+                  <Sparkles className="size-4" />
                 </div>
-                <h1 className="mt-2 text-xl font-bold tracking-tight text-stone-950 text-balance sm:text-2xl">月光影像创作台</h1>
-                <p className="mt-1 max-w-[42rem] text-sm leading-6 text-stone-500">
-                  选模板或输入提示词 · 上传参考图 · 生成后继续编辑
-                </p>
-              </div>
-              <div className="hidden w-full grid-cols-3 gap-2 text-center text-xs md:w-auto md:min-w-[260px]">
-                {[
-                  ["1", "选模板"],
-                  ["2", imageMode === "edit" ? "放参考图" : "写描述"],
-                  ["3", "出结果"],
-                ].map(([step, label]) => (
-                  <div key={step} className="rounded-xl border border-white/70 bg-white/62 px-3 py-2">
-                    <div className="mx-auto grid size-6 place-items-center rounded-full bg-[#2d1d26] text-[11px] font-bold text-white">{step}</div>
-                    <div className="mt-1 font-semibold text-stone-700">{label}</div>
+                <div className="min-w-0">
+                  <div className="text-base font-semibold tracking-tight text-stone-950">创作台</div>
+                  <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-stone-500">
+                    <span>今日 {workspaceStats.todayGenerated} 张</span>
+                    <span>{workspaceStats.active} 个处理中</span>
+                    <span>额度 {availableQuota}</span>
                   </div>
-                ))}
+                </div>
               </div>
               <label className="relative w-full md:max-w-[320px]">
                 <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-stone-400" />
@@ -1206,19 +1302,11 @@ function ImagePageContent({ session }: { session: StoredAuthSession }) {
             </div>
           </header>
 
-          {conversations.length === 0 ? (
-            <div className="rounded-lg border border-rose-100 bg-white px-4 py-3 text-sm text-stone-600 shadow-sm">
-              <span className="font-semibold text-stone-900">新用户启动：</span>
-              先选一个模板，写清主体和用途，生成第一张图后可以在结果里继续编辑。额度充值已收进个人中心。
-            </div>
-          ) : null}
-
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 2xl:grid-cols-4">
-            <WorkspaceMetric label="今日生成" value={workspaceStats.todayGenerated} />
-            <WorkspaceMetric label="成功率" value={workspaceStats.successRate} />
-            <WorkspaceMetric label="处理中" value={workspaceStats.active} />
-            <WorkspaceMetric label="历史作品" value={workspaceStats.successImages} />
-          </div>
+          <StarterSceneStrip
+            scenes={STARTER_SCENES}
+            activeSceneId={STARTER_SCENES.find((scene) => scene.prompt === imagePrompt)?.id}
+            onSelect={handleStarterSceneSelect}
+          />
 
           <div className="lg:min-h-0 lg:flex-1 lg:overflow-hidden">
             <div ref={resultsViewportRef} className="yan-panel rounded-lg lg:h-full lg:min-h-0 lg:overflow-y-auto">
@@ -1239,6 +1327,7 @@ function ImagePageContent({ session }: { session: StoredAuthSession }) {
                   selectedConversation={selectedConversation}
                   onOpenLightbox={openLightbox}
                   onContinueEdit={handleContinueEdit}
+                  onUsePromptDraft={handleUsePromptDraft}
                   onRetryTurn={handleRetryTurn}
                   formatConversationTime={formatConversationTime}
                 />
@@ -1265,7 +1354,6 @@ function ImagePageContent({ session }: { session: StoredAuthSession }) {
             prompt={imagePrompt}
             imageCount={imageCount}
             imageSize={imageSize}
-            availableQuota={availableQuota}
             activeTaskCount={activeTaskCount}
             referenceImages={referenceImages}
             textareaRef={textareaRef}
@@ -1368,11 +1456,49 @@ function ImageStudioSidebar({
   );
 }
 
-function WorkspaceMetric({ label, value }: { label: string; value: string | number }) {
+function StarterSceneStrip({
+  scenes,
+  activeSceneId,
+  onSelect,
+}: {
+  scenes: StarterScene[];
+  activeSceneId?: string;
+  onSelect: (scene: StarterScene) => void;
+}) {
   return (
-    <div className="yan-panel-strong rounded-lg px-4 py-3">
-      <div className="text-xs font-medium text-stone-500">{label}</div>
-      <div className="mt-2 text-2xl font-bold tracking-tight text-stone-950">{value}</div>
+    <div className="grid gap-2 sm:grid-cols-2 2xl:grid-cols-4">
+      {scenes.map((scene) => {
+        const Icon = scene.icon;
+        const active = scene.id === activeSceneId;
+        return (
+          <button
+            key={scene.id}
+            type="button"
+            onClick={() => onSelect(scene)}
+            className={[
+              "group overflow-hidden rounded-lg border bg-white text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-200",
+              active ? "border-rose-300 ring-1 ring-rose-200" : "border-white/80 hover:border-rose-200",
+            ].join(" ")}
+          >
+            <div className={["relative h-20", scene.visualClassName].join(" ")}>
+              <div className="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-white/80 to-transparent" />
+              <div className="absolute left-3 top-3 grid size-9 place-items-center rounded-lg bg-white/80 text-stone-900 shadow-sm">
+                <Icon className="size-4" />
+              </div>
+              <div className="absolute right-3 top-3 rounded-full bg-white/75 px-2.5 py-1 text-[11px] font-semibold text-stone-700">
+                {scene.meta}
+              </div>
+            </div>
+            <div className="px-3 py-3">
+              <div className="flex items-center justify-between gap-2">
+                <div className="truncate text-sm font-semibold text-stone-950">{scene.title}</div>
+                <div className={active ? "size-2 rounded-full bg-rose-500" : "size-2 rounded-full bg-stone-200 transition group-hover:bg-rose-300"} />
+              </div>
+              <div className="mt-1 truncate text-xs text-stone-500">{scene.tone}</div>
+            </div>
+          </button>
+        );
+      })}
     </div>
   );
 }

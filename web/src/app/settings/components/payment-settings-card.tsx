@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AlertTriangle, CheckCircle2, CreditCard, LoaderCircle, Plus, Save, Trash2 } from "lucide-react";
+import { AlertTriangle, CheckCircle2, CreditCard, LoaderCircle, Plus, Save, Sparkles, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -30,9 +30,19 @@ const emptySettings: BillingSettings = {
   support_url: "",
 };
 
+const paymentTypeOptions = [
+  { value: "alipay", label: "支付宝" },
+  { value: "wxpay", label: "微信支付" },
+  { value: "qqpay", label: "QQ 钱包" },
+];
+
 function newPlan(): BillingPlan {
   const id = `plan-${Date.now()}`;
   return { id, label: "新套餐", quota: 100, price: "9.90", enabled: true, sort_order: 0 };
+}
+
+function currentOrigin() {
+  return typeof window === "undefined" ? "" : window.location.origin;
 }
 
 export function PaymentSettingsCard() {
@@ -66,6 +76,20 @@ export function PaymentSettingsCard() {
 
   const patchPlan = (index: number, updates: Partial<BillingPlan>) => {
     setPlans((current) => current.map((plan, idx) => (idx === index ? { ...plan, ...updates } : plan)));
+  };
+
+  const fillCurrentSiteUrls = () => {
+    const origin = currentOrigin();
+    if (!origin) {
+      toast.error("无法读取当前站点地址");
+      return;
+    }
+    patchSettings({
+      frontend_url: origin,
+      notify_url: `${origin}/api/payment/easypay/notify`,
+      return_url: `${origin}/profile`,
+    });
+    toast.success("已填入当前站点地址");
   };
 
   const publicUrlChecks = [
@@ -137,10 +161,16 @@ export function PaymentSettingsCard() {
             </div>
             <p className="mt-1 text-sm text-stone-500">配置商户信息、回调地址和用户可购买的额度套餐。</p>
           </div>
-          <Button onClick={() => void save()} disabled={isSaving} className="h-10 rounded-xl bg-stone-950 px-4 text-white hover:bg-stone-800">
-            {isSaving ? <LoaderCircle className="size-4 animate-spin" /> : <Save className="size-4" />}
-            保存支付设置
-          </Button>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Button type="button" variant="outline" onClick={fillCurrentSiteUrls} className="h-10 rounded-xl border-stone-200 bg-white px-4 text-stone-700">
+              <Sparkles className="size-4" />
+              填入当前站点
+            </Button>
+            <Button onClick={() => void save()} disabled={isSaving} className="h-10 rounded-xl bg-stone-950 px-4 text-white hover:bg-stone-800">
+              {isSaving ? <LoaderCircle className="size-4 animate-spin" /> : <Save className="size-4" />}
+              保存支付设置
+            </Button>
+          </div>
         </div>
 
         <div className="grid gap-4 lg:grid-cols-2">
@@ -167,7 +197,24 @@ export function PaymentSettingsCard() {
           </label>
           <label className="block space-y-1.5">
             <span className="text-xs font-medium text-stone-500">支付类型</span>
-            <Input value={settings.payment_type || "alipay"} onChange={(event) => patchSettings({ payment_type: event.target.value })} placeholder="alipay / wxpay / qqpay" className="h-10 rounded-xl border-stone-200 bg-stone-50" />
+            <div className="grid grid-cols-3 gap-2">
+              {paymentTypeOptions.map((option) => {
+                const active = (settings.payment_type || "alipay") === option.value;
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => patchSettings({ payment_type: option.value })}
+                    className={[
+                      "h-10 rounded-xl border px-3 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-200",
+                      active ? "border-rose-300 bg-rose-50 text-rose-700" : "border-stone-200 bg-stone-50 text-stone-600 hover:bg-white",
+                    ].join(" ")}
+                  >
+                    {option.label}
+                  </button>
+                );
+              })}
+            </div>
             <span className="block text-xs text-stone-400">用户在结算时选择支付宝或微信；这里仅作为兜底默认值。</span>
           </label>
           <label className="block space-y-1.5">
@@ -177,6 +224,7 @@ export function PaymentSettingsCard() {
           <label className="block space-y-1.5">
             <span className="text-xs font-medium text-stone-500">异步通知地址</span>
             <Input value={settings.notify_url || ""} onChange={(event) => patchSettings({ notify_url: event.target.value })} placeholder="留空使用 /api/payment/easypay/notify" className="h-10 rounded-xl border-stone-200 bg-stone-50" />
+            <span className="block text-xs text-stone-400">公网部署建议填写：https://你的域名/api/payment/easypay/notify</span>
           </label>
           <label className="block space-y-1.5">
             <span className="text-xs font-medium text-stone-500">前端站点地址</span>
@@ -186,6 +234,7 @@ export function PaymentSettingsCard() {
           <label className="block space-y-1.5">
             <span className="text-xs font-medium text-stone-500">支付返回地址</span>
             <Input value={settings.return_url || ""} onChange={(event) => patchSettings({ return_url: event.target.value })} placeholder="留空返回 /profile" className="h-10 rounded-xl border-stone-200 bg-stone-50" />
+            <span className="block text-xs text-stone-400">公网部署建议填写：https://你的域名/profile</span>
           </label>
         </div>
 

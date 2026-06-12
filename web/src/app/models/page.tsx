@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { BadgeDollarSign, LoaderCircle, RefreshCw, Save, Search, ServerCog } from "lucide-react";
 import { toast } from "sonner";
 
@@ -91,13 +91,13 @@ function ModelsContent() {
   const [savingModel, setSavingModel] = useState("");
   const [refreshingChannel, setRefreshingChannel] = useState("");
 
-  const applyCatalog = (items: ManagedModel[], nextChannels: ModelChannelSummary[]) => {
+  const applyCatalog = useCallback((items: ManagedModel[], nextChannels: ModelChannelSummary[]) => {
     setModels(items);
     setChannels(nextChannels);
     setDrafts(Object.fromEntries(items.map((item) => [item.model, pricingToDraft(item.pricing)])));
-  };
+  }, []);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setIsLoading(true);
     try {
       const data = await fetchModelCatalog();
@@ -107,11 +107,11 @@ function ModelsContent() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [applyCatalog]);
 
   useEffect(() => {
     void load();
-  }, []);
+  }, [load]);
 
   const filteredModels = useMemo(() => {
     const keyword = query.trim().toLowerCase();

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
   CalendarDays,
@@ -354,11 +355,32 @@ function MyImagesContent() {
             </div>
           </div>
           {isLoading ? (
-            <div className="flex h-56 items-center justify-center">
-              <LoaderCircle className="size-5 animate-spin text-rose-400" />
+            <div className="grid gap-0 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" aria-label="正在加载图片">
+              {Array.from({ length: 8 }).map((_, index) => (
+                <div key={index} className="border-r border-b border-rose-50 p-4">
+                  <div className="aspect-square animate-pulse rounded-xl bg-rose-50" />
+                  <div className="mt-3 flex items-center justify-between gap-3">
+                    <div className="h-4 w-28 animate-pulse rounded-full bg-stone-100" />
+                    <div className="h-8 w-16 animate-pulse rounded-lg bg-stone-100" />
+                  </div>
+                </div>
+              ))}
             </div>
           ) : items.length === 0 ? (
-            <div className="px-6 py-14 text-center text-sm text-stone-500">还没有生成过图片</div>
+            <div className="flex min-h-[320px] items-center justify-center px-6 py-14 text-center">
+              <div className="max-w-sm space-y-4">
+                <div className="mx-auto grid size-12 place-items-center rounded-lg bg-rose-50 text-rose-500">
+                  <ImageIcon className="size-5" />
+                </div>
+                <div>
+                  <h2 className="text-base font-semibold text-stone-950">还没有作品</h2>
+                  <p className="mt-2 text-sm leading-6 text-stone-500">完成第一张图后，这里会自动沉淀作品、下载和批量同步入口。</p>
+                </div>
+                <Button asChild className="h-10 rounded-xl bg-rose-500 px-4 text-white hover:bg-rose-600">
+                  <Link href="/image">去画图</Link>
+                </Button>
+              </div>
+            </div>
           ) : (
             <div className="grid gap-0 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {items.map((item, index) => {

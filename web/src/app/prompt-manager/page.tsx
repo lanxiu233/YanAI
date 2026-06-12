@@ -238,7 +238,7 @@ function PromptManagerContent({ session }: { session: StoredAuthSession }) {
     });
   }, [category, items, query, statusFilter]);
 
-  const loadPrompts = async () => {
+  const loadPrompts = useCallback(async () => {
     setIsLoading(true);
     try {
       const data = isAdmin ? await fetchAdminPrompts() : await fetchMyPrompts();
@@ -248,11 +248,11 @@ function PromptManagerContent({ session }: { session: StoredAuthSession }) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [isAdmin]);
 
   useEffect(() => {
     void loadPrompts();
-  }, []);
+  }, [loadPrompts]);
 
   const loadSharePreview = useCallback(async (value: string) => {
     const shareId = extractShareId(value);

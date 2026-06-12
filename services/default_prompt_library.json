@@ -52,6 +52,7 @@
       "id": "photo-portrait-v1",
       "title": "写真随机风格 V1",
       "description": "随机组合真人写真提示词",
+      "preview": "/banana-prompt-quicker/images/fashion_portrait_collage.jpg",
       "mode": "edit",
       "image_count": "1",
       "icon": "aperture",

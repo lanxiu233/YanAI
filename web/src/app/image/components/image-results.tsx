@@ -1,11 +1,17 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Clock3, Copy, ImageIcon, LoaderCircle, RotateCcw, Share2, Sparkles } from "lucide-react";
+import { Clock3, Copy, ImageIcon, LoaderCircle, RotateCcw, Save, Share2, Sparkles, WandSparkles } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import { createPromptShare, fetchPromptLibrary, type PromptLibraryItem, type PromptLibraryPayload } from "@/lib/api";
+import {
+  createMyPrompt,
+  createPromptShare,
+  fetchPromptLibrary,
+  type PromptLibraryItem,
+  type PromptLibraryPayload,
+} from "@/lib/api";
 import { resolveApiAssetUrl } from "@/lib/assets";
 import { cn } from "@/lib/utils";
 import type { ImageConversation, ImageTurnStatus, StoredImage, StoredReferenceImage } from "@/store/image-conversations";
@@ -20,7 +26,11 @@ export type ImageLightboxItem = {
 type ImageResultsProps = {
   selectedConversation: ImageConversation | null;
   onOpenLightbox: (images: ImageLightboxItem[], index: number) => void;
-  onContinueEdit: (conversationId: string, image: StoredImage | StoredReferenceImage) => void;
+  onContinueEdit: (conversationId: string, image: StoredImage | StoredReferenceImage, promptDraft?: string) => void;
+  onUsePromptDraft: (
+    prompt: string,
+    options?: { mode?: string; size?: string; count?: string; referenceImages?: StoredReferenceImage[] },
+  ) => void;
   onRetryTurn: (conversationId: string, turnId: string) => void | Promise<void>;
   formatConversationTime: (value: string) => string;
 };
@@ -64,9 +74,13 @@ const emptyStateExampleSources: EmptyStatePromptSource[] = [
     id: "photo-portrait-v1",
     label: "写真随机风格 V1",
     fallbackTitle: "写真随机风格 V1",
-    fallbackPreview: "/prompt-assets/2026/06/02/2d2db3cac0f5412d83e79af24905b4e9.png",
+    fallbackPreview: "/banana-prompt-quicker/images/fashion_portrait_collage.jpg",
   },
 ];
+
+const emptyStatePreviewOverrides: Record<string, string> = {
+  "photo-portrait-v1": "/banana-prompt-quicker/images/fashion_portrait_collage.jpg",
+};
 
 function buildPromptShareTitle(prompt: string) {
   const cleaned = prompt.replace(/\s+/g, " ").trim();
@@ -102,6 +116,7 @@ export function ImageResults({
   selectedConversation,
   onOpenLightbox,
   onContinueEdit,
+  onUsePromptDraft,
   onRetryTurn,
   formatConversationTime,
 }: ImageResultsProps) {
@@ -177,6 +192,33 @@ export function ImageResults({
       toast.error(error instanceof Error ? error.message : "分享失败");
     }
   };
+
+  const saveTurnPrompt = async (turn: { prompt: string; mode: string; size: string; count: number }) => {
+    const cleaned = turn.prompt.trim();
+    if (!cleaned) {
+      toast.error("没有可保存的提示词");
+      return;
+    }
+    try {
+      await createMyPrompt({
+        title: buildPromptShareTitle(cleaned),
+        description: turn.mode === "edit" ? "从创作结果保存的图生图提示词" : "从创作结果保存的文生图提示词",
+        prompt: cleaned,
+        mode: turn.mode,
+        image_size: turn.size,
+        image_count: String(turn.count),
+      });
+      toast.success("已保存到我的提示词");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "保存失败");
+    }
+  };
+
+  const buildStyleShiftPrompt = (prompt: string) =>
+    `${prompt.trim()}\n\n基于这张图换一种更有新鲜感的视觉风格：保留主体和核心构图，重新调整光线、色彩、氛围和画面质感，让结果更像一张完成度更高的作品。`;
+
+  const buildEnhancePrompt = () =>
+    "基于这张图做高清质感增强：保留主体、构图、身份和画面内容不变，提升清晰度、细节、光影层次和色彩质感，降低噪点和压缩痕迹，保持真实自然，不要改变人物五官或主体结构。";
 
   if (!selectedConversation) {
     return (
@@ -275,16 +317,34 @@ export function ImageResults({
                     分享
                   </Button>
                   {turn.status === "error" ? (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="h-9 justify-center rounded-lg border-amber-200 bg-amber-50 px-2.5 text-amber-800 hover:bg-amber-100 sm:justify-start"
-                      onClick={() => void onRetryTurn(selectedConversation.id, turn.id)}
-                    >
-                      <RotateCcw className="size-4" />
-                      重试
-                    </Button>
+                    <>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-9 justify-center rounded-lg border-amber-200 bg-amber-50 px-2.5 text-amber-800 hover:bg-amber-100 sm:justify-start"
+                        onClick={() => void onRetryTurn(selectedConversation.id, turn.id)}
+                      >
+                        <RotateCcw className="size-4" />
+                        重试
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-9 justify-center rounded-lg border-rose-100 bg-white/85 px-2.5 text-stone-700 hover:bg-white sm:justify-start"
+                        onClick={() =>
+                          onUsePromptDraft(turn.prompt, {
+                            mode: turn.mode,
+                            size: turn.size,
+                            count: "1",
+                            referenceImages: turn.referenceImages,
+                          })
+                        }
+                      >
+                        改成 1 张
+                      </Button>
+                    </>
                   ) : null}
                   <div className="flex h-9 items-center justify-center rounded-full bg-rose-50 px-3 py-1 text-xs font-semibold text-stone-600">
                     {turn.count} 张
@@ -371,15 +431,44 @@ export function ImageResults({
                           <span>结果 {index + 1}</span>
                           {imageMeta ? <span className="ml-2 text-stone-400">{imageMeta}</span> : null}
                         </div>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="w-full justify-center rounded-lg border-rose-100 bg-white/85 text-stone-700 hover:bg-white sm:w-auto"
-                          onClick={() => onContinueEdit(selectedConversation.id, image)}
-                        >
-                          <Sparkles className="size-4" />
-                          继续编辑
-                        </Button>
+                        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-end">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="justify-center rounded-lg border-rose-100 bg-white/85 text-stone-700 hover:bg-white"
+                            onClick={() => onContinueEdit(selectedConversation.id, image)}
+                          >
+                            <Sparkles className="size-4" />
+                            编辑
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="justify-center rounded-lg border-rose-100 bg-white/85 text-stone-700 hover:bg-white"
+                            onClick={() => onContinueEdit(selectedConversation.id, image, buildStyleShiftPrompt(turn.prompt))}
+                          >
+                            <WandSparkles className="size-4" />
+                            换风格
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="justify-center rounded-lg border-rose-100 bg-white/85 text-stone-700 hover:bg-white"
+                            onClick={() => onContinueEdit(selectedConversation.id, image, buildEnhancePrompt())}
+                          >
+                            <Sparkles className="size-4" />
+                            增强
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="justify-center rounded-lg border-rose-100 bg-white/85 text-stone-700 hover:bg-white"
+                            onClick={() => void saveTurnPrompt(turn)}
+                          >
+                            <Save className="size-4" />
+                            保存
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   );
@@ -396,7 +485,37 @@ export function ImageResults({
                       )}
                     >
                       <div className="flex h-full items-center justify-center px-6 py-8 text-center text-sm leading-6 text-rose-600">
-                        {image.error || "生成失败"}
+                        <div className="space-y-3">
+                          <div>{image.error || "生成失败"}</div>
+                          <div className="flex flex-wrap justify-center gap-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="h-8 rounded-lg border-rose-100 bg-white/85 text-stone-700"
+                              onClick={() =>
+                                onUsePromptDraft(turn.prompt, {
+                                  mode: turn.mode,
+                                  size: turn.size,
+                                  count: "1",
+                                  referenceImages: turn.referenceImages,
+                                })
+                              }
+                            >
+                              改成 1 张
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="h-8 rounded-lg border-rose-100 bg-white/85 text-stone-700"
+                              onClick={() => void copyTurnPrompt(turn.prompt)}
+                            >
+                              <Copy className="size-4" />
+                              复制提示词
+                            </Button>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   );
@@ -459,11 +578,12 @@ function findPromptPreview(source: EmptyStatePromptSource, items: PromptLibraryI
 
 function buildEmptyStatePromptPreview(source: EmptyStatePromptSource, items: PromptLibraryItem[]) {
   const prompt = findPromptPreview(source, items);
+  const previewOverride = source.id ? emptyStatePreviewOverrides[source.id] : "";
   return {
     label: source.label || prompt?.title || source.fallbackTitle,
     title: prompt?.title || source.fallbackTitle,
     description: prompt?.description || source.fallbackDescription || "",
-    preview: resolveApiAssetUrl(prompt?.preview || source.fallbackPreview),
+    preview: resolveApiAssetUrl(previewOverride || prompt?.preview || source.fallbackPreview),
   };
 }
 

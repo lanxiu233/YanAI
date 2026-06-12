@@ -364,7 +364,7 @@ function HomePageInner() {
               >
                 {registrationClosed ? (
                   <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">
-                    当前未开放个人注册，请联系管理员创建账号。
+                    当前未开放个人注册，请联系站点支持创建账号。
                   </div>
                 ) : null}
                 <div className="space-y-4">

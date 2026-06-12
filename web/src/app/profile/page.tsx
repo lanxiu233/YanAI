@@ -33,6 +33,35 @@ import { RechargeDialog } from "./components/recharge-dialog";
 
 type PaymentType = "alipay" | "wxpay";
 
+function ProfileSkeleton() {
+  return (
+    <section className="mx-auto w-full max-w-5xl space-y-5">
+      <div className="space-y-2">
+        <div className="h-3 w-24 rounded-full bg-rose-100" />
+        <div className="h-8 w-32 rounded-lg bg-stone-100" />
+      </div>
+      <div className="grid gap-4 md:grid-cols-3">
+        <div className="h-40 rounded-lg border border-white/80 bg-white/70 p-6 shadow-sm md:col-span-2">
+          <div className="h-4 w-20 rounded-full bg-stone-100" />
+          <div className="mt-3 h-6 w-64 max-w-full rounded-lg bg-stone-100" />
+          <div className="mt-6 grid gap-3 sm:grid-cols-[1fr_auto]">
+            <div className="h-11 rounded-xl bg-stone-100" />
+            <div className="h-11 rounded-xl bg-rose-100 sm:w-28" />
+          </div>
+        </div>
+        <div className="h-56 rounded-lg border border-white/80 bg-white/70 p-6 shadow-sm">
+          <div className="size-11 rounded-xl bg-rose-100" />
+          <div className="mt-5 h-4 w-20 rounded-full bg-stone-100" />
+          <div className="mt-3 h-10 w-24 rounded-lg bg-rose-100" />
+          <div className="mt-5 h-10 rounded-xl bg-stone-100" />
+        </div>
+      </div>
+      <div className="h-28 rounded-lg border border-white/80 bg-white/70 shadow-sm" />
+      <div className="h-72 rounded-lg border border-white/80 bg-white/70 shadow-sm" />
+    </section>
+  );
+}
+
 function ProfileContent() {
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [checkin, setCheckin] = useState<CheckinStatus | null>(null);
@@ -140,7 +169,7 @@ function ProfileContent() {
     try {
       const data = await createPaymentOrder(plan.id, paymentType);
       if (!data.pay_url) {
-        toast.error("支付链接生成失败，请联系管理员");
+        toast.error("支付链接生成失败，请联系支持");
         return;
       }
       window.location.assign(data.pay_url);
@@ -211,11 +240,7 @@ function ProfileContent() {
   };
 
   if (isLoading) {
-    return (
-      <div className="flex min-h-[40vh] items-center justify-center">
-        <LoaderCircle className="size-5 animate-spin text-rose-400" />
-      </div>
-    );
+    return <ProfileSkeleton />;
   }
 
   return (
@@ -313,11 +338,7 @@ function ProfileContent() {
 export default function ProfilePage() {
   const { isCheckingAuth, session } = useAuthGuard(["user"]);
   if (isCheckingAuth || !session) {
-    return (
-      <div className="flex min-h-[40vh] items-center justify-center">
-        <LoaderCircle className="size-5 animate-spin text-rose-400" />
-      </div>
-    );
+    return <ProfileSkeleton />;
   }
   return <ProfileContent />;
 }

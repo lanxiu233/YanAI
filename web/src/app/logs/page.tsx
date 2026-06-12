@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight, LoaderCircle, RefreshCw, Search } from "lucide-react";
 import { toast } from "sonner";
 
@@ -87,7 +87,7 @@ function LogsContent() {
   const safePage = Math.min(page, pageCount);
   const currentRows = items;
 
-  const loadLogs = async (nextPage = page) => {
+  const loadLogs = useCallback(async (nextPage: number) => {
     setIsLoading(true);
     try {
       const data = await fetchSystemLogs({
@@ -108,7 +108,7 @@ function LogsContent() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [endDate, isCallLog, startDate, status, type, userQuery]);
 
   const clearFilters = () => {
     setStatus(LogStatus.All);
@@ -124,7 +124,7 @@ function LogsContent() {
 
   useEffect(() => {
     void loadLogs(1);
-  }, [type, status, startDate, endDate, userQuery]);
+  }, [loadLogs]);
 
   return (
     <section className="space-y-5">
@@ -162,7 +162,7 @@ function LogsContent() {
           <Button variant="outline" onClick={clearFilters} className="h-10 justify-center rounded-xl border-stone-200 bg-white px-4 text-stone-700">
             清除筛选条件
           </Button>
-          <Button onClick={() => void loadLogs()} disabled={isLoading} className="h-10 justify-center rounded-xl bg-stone-950 px-4 text-white hover:bg-stone-800">
+          <Button onClick={() => void loadLogs(page)} disabled={isLoading} className="h-10 justify-center rounded-xl bg-stone-950 px-4 text-white hover:bg-stone-800">
             {isLoading ? <LoaderCircle className="size-4 animate-spin" /> : <Search className="size-4" />}
             查询
           </Button>
@@ -173,7 +173,7 @@ function LogsContent() {
         <CardContent className="p-0">
           <div className="flex flex-col gap-2 border-b border-stone-100 px-5 py-4 text-sm text-stone-600 sm:flex-row sm:items-center sm:justify-between">
             <span>共 {total} 条</span>
-            <Button variant="ghost" className="h-10 justify-center rounded-lg px-3 text-stone-500 sm:h-8 sm:justify-start" onClick={() => void loadLogs()} disabled={isLoading}>
+            <Button variant="ghost" className="h-10 justify-center rounded-lg px-3 text-stone-500 sm:h-8 sm:justify-start" onClick={() => void loadLogs(page)} disabled={isLoading}>
               <RefreshCw className={`size-4 ${isLoading ? "animate-spin" : ""}`} />
               刷新
             </Button>
