@@ -42,4 +42,7 @@ web/coverage/
 web/.vercel/
 web/*.tsbuildinfo
 
+# Local brainstorming companion artifacts
+.superpowers/
+
 Plan.md
