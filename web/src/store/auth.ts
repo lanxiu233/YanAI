@@ -24,6 +24,10 @@ const authStorage = localforage.createInstance({
 let sessionCache: StoredAuthSession | null | undefined;
 let keyCache: string | null | undefined;
 
+export function getCachedAuthSession() {
+  return sessionCache;
+}
+
 function normalizeSession(value: unknown, fallbackKey = ""): StoredAuthSession | null {
   if (!value || typeof value !== "object") {
     return null;

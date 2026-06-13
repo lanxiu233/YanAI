@@ -4,11 +4,13 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import {
+  getCachedAuthSession,
   getDefaultRouteForRole,
   getStoredAuthSession,
   type AuthRole,
   type StoredAuthSession,
 } from "@/store/auth";
+import { getInitialAuthGuardState } from "@/lib/auth-guard-state";
 
 type UseAuthGuardResult = {
   isCheckingAuth: boolean;
@@ -17,9 +19,10 @@ type UseAuthGuardResult = {
 
 export function useAuthGuard(allowedRoles?: AuthRole[]): UseAuthGuardResult {
   const router = useRouter();
-  const [session, setSession] = useState<StoredAuthSession | null>(null);
-  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const allowedRolesKey = (allowedRoles || []).join(",");
+  const initialState = getInitialAuthGuardState(getCachedAuthSession(), allowedRolesKey);
+  const [session, setSession] = useState<StoredAuthSession | null>(initialState.session);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(initialState.isCheckingAuth);
 
   useEffect(() => {
     let active = true;

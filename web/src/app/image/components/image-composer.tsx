@@ -1048,7 +1048,7 @@ export function ImageComposer({
           />
         )}
 
-        <div className="mb-4 grid grid-cols-2 gap-2">
+        <div className="mb-4 grid grid-cols-2 gap-2" data-guide-target="mode">
           <ModeButton active={mode === "generate"} onClick={() => onModeChange("generate")}>
             文生图
           </ModeButton>
@@ -1397,6 +1397,7 @@ export function ImageComposer({
             </div>
           </div>
           <div
+            data-guide-target="prompt"
             className="relative cursor-text"
             onClick={() => {
               textareaRef.current?.focus();
@@ -1428,10 +1429,11 @@ export function ImageComposer({
 
             <div className="border-t border-rose-100 bg-white/80 px-3 py-3">
               <div className="flex flex-col gap-3">
-                <div className="grid min-w-0 flex-1 grid-cols-2 gap-2">
+                <div className="grid min-w-0 flex-1 grid-cols-2 gap-2" data-guide-target="settings">
                   {mode === "edit" && (
                     <Button
                       type="button"
+                      data-guide-target="reference"
                       variant="outline"
                       className="col-span-2 h-10 rounded-lg border-rose-100 bg-white/85 px-3 text-sm font-medium text-stone-700 shadow-none"
                       onClick={onPickReferenceImage}
@@ -1468,6 +1470,8 @@ export function ImageComposer({
                     <span className="font-medium text-stone-700">比例</span>
                     <button
                       type="button"
+                      aria-haspopup="listbox"
+                      aria-expanded={isSizeMenuOpen}
                       className="flex h-10 min-w-0 flex-1 items-center justify-between bg-transparent text-left text-sm font-bold text-stone-700 lg:h-7"
                       onClick={() => setIsSizeMenuOpen((open) => !open)}
                     >
@@ -1504,6 +1508,7 @@ export function ImageComposer({
 
                 <button
                   type="button"
+                  data-guide-target="generate"
                   onClick={() => void onSubmit()}
                   disabled={!prompt.trim() || (mode === "edit" && referenceImages.length === 0)}
                   className="yan-gradient inline-flex h-11 w-full shrink-0 items-center justify-center rounded-lg text-white transition hover:brightness-105 disabled:cursor-not-allowed disabled:bg-stone-300 disabled:brightness-100"
@@ -1533,6 +1538,7 @@ function ModeButton({
   return (
     <button
       type="button"
+      aria-pressed={active}
       onClick={onClick}
       className={cn(
         "rounded-lg px-2.5 py-1.5 text-xs font-medium transition sm:px-4 sm:py-2 sm:text-sm",

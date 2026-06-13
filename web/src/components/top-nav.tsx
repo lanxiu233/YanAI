@@ -37,7 +37,7 @@ import {
   type AnnouncementConfig,
 } from "@/lib/api";
 import { cn } from "@/lib/utils";
-import { clearStoredAuthSession, getStoredAuthSession, type StoredAuthSession } from "@/store/auth";
+import { clearStoredAuthSession, getCachedAuthSession, getStoredAuthSession, type StoredAuthSession } from "@/store/auth";
 
 type NavItem = {
   href: string;
@@ -90,7 +90,7 @@ function formatAnnouncementTime(value?: string | null) {
 export function TopNav() {
   const pathname = usePathname();
   const router = useRouter();
-  const [session, setSession] = useState<StoredAuthSession | null | undefined>(undefined);
+  const [session, setSession] = useState<StoredAuthSession | null | undefined>(() => getCachedAuthSession());
   const [announcement, setAnnouncement] = useState<AnnouncementConfig | null>(null);
   const [announcementOpen, setAnnouncementOpen] = useState(false);
   const sessionKey = session?.key;

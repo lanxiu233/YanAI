@@ -11,6 +11,7 @@ import {
 } from "react";
 import {
   Camera,
+  HelpCircle,
   IdCard,
   LoaderCircle,
   Menu,
@@ -24,6 +25,12 @@ import {
 import { toast } from "sonner";
 
 import { ImageComposer } from "@/app/image/components/image-composer";
+import {
+  createImageComposerDraft,
+  getImageComposerDraftStorageKey,
+  parseImageComposerDraft,
+} from "@/app/image/components/image-composer-draft";
+import { ImageOnboardingGuide } from "@/app/image/components/image-onboarding-guide";
 import { ImageResults, type ImageLightboxItem } from "@/app/image/components/image-results";
 import { ImageSidebar } from "@/app/image/components/image-sidebar";
 import { ImageLightbox } from "@/components/image-lightbox";
@@ -60,6 +67,7 @@ import type { StoredAuthSession } from "@/store/auth";
 const ACTIVE_CONVERSATION_STORAGE_KEY = "chatgpt2api:image_active_conversation_id";
 const IMAGE_SIZE_STORAGE_KEY = "chatgpt2api:image_last_size";
 const COMPOSER_PANEL_WIDTH_STORAGE_KEY = "chatgpt2api:image_composer_panel_width";
+const COMPOSER_DRAFT_SAVE_DELAY_MS = 260;
 const COMPOSER_PANEL_DEFAULT_WIDTH = 420;
 const COMPOSER_PANEL_MIN_WIDTH = 360;
 const COMPOSER_PANEL_MAX_WIDTH = 720;
@@ -350,6 +358,7 @@ function ImagePageContent({ session }: { session: StoredAuthSession }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const composerPanelWidthRef = useRef(COMPOSER_PANEL_DEFAULT_WIDTH);
   const composerPanelDragRef = useRef<{ startX: number; startWidth: number } | null>(null);
+  const didRestoreComposerDraftRef = useRef(false);
 
   const [workspaceSearch, setWorkspaceSearch] = useState("");
   const [imagePrompt, setImagePrompt] = useState("");
@@ -369,6 +378,7 @@ function ImagePageContent({ session }: { session: StoredAuthSession }) {
   const [deleteConfirm, setDeleteConfirm] = useState<{ type: "one"; id: string } | { type: "all" } | null>(null);
   const [composerPanelWidth, setComposerPanelWidth] = useState(COMPOSER_PANEL_DEFAULT_WIDTH);
   const [isComposerPanelResizing, setIsComposerPanelResizing] = useState(false);
+  const [imageGuideReplaySignal, setImageGuideReplaySignal] = useState(0);
 
   const imageConversationOwnerKey = useMemo(() => getImageConversationOwnerKey(session), [session]);
   const activeConversationStorageKey = useMemo(
@@ -377,6 +387,10 @@ function ImagePageContent({ session }: { session: StoredAuthSession }) {
   );
   const imageSizeStorageKey = useMemo(
     () => getScopedStorageKey(IMAGE_SIZE_STORAGE_KEY, imageConversationOwnerKey),
+    [imageConversationOwnerKey],
+  );
+  const imageComposerDraftStorageKey = useMemo(
+    () => getImageComposerDraftStorageKey(imageConversationOwnerKey),
     [imageConversationOwnerKey],
   );
   const parsedCount = useMemo(() => Math.max(1, Math.min(10, Number(imageCount) || 1)), [imageCount]);
@@ -654,6 +668,47 @@ function ImagePageContent({ session }: { session: StoredAuthSession }) {
     }
     window.localStorage.removeItem(imageSizeStorageKey);
   }, [imageSize, imageSizeStorageKey, isLoadingHistory]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || isLoadingHistory || didRestoreComposerDraftRef.current) {
+      return;
+    }
+
+    didRestoreComposerDraftRef.current = true;
+    const draft = parseImageComposerDraft(window.localStorage.getItem(imageComposerDraftStorageKey));
+    if (!draft) {
+      return;
+    }
+
+    setImagePrompt((current) => current || draft.prompt);
+    setImageMode(draft.mode);
+    setImageCount(draft.imageCount);
+    setImageSize(draft.imageSize);
+  }, [imageComposerDraftStorageKey, isLoadingHistory]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || isLoadingHistory || !didRestoreComposerDraftRef.current) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      const draft = createImageComposerDraft({
+        prompt: imagePrompt,
+        mode: imageMode,
+        imageCount,
+        imageSize,
+      });
+
+      if (draft) {
+        window.localStorage.setItem(imageComposerDraftStorageKey, JSON.stringify(draft));
+        return;
+      }
+
+      window.localStorage.removeItem(imageComposerDraftStorageKey);
+    }, COMPOSER_DRAFT_SAVE_DELAY_MS);
+
+    return () => window.clearTimeout(timeout);
+  }, [imageComposerDraftStorageKey, imageCount, imageMode, imagePrompt, imageSize, isLoadingHistory]);
 
   useEffect(() => {
     if (selectedConversationId && !conversations.some((conversation) => conversation.id === selectedConversationId)) {
@@ -1193,6 +1248,7 @@ function ImagePageContent({ session }: { session: StoredAuthSession }) {
 
     setSelectedConversationId(conversationId);
     clearComposerInputs();
+    window.localStorage.removeItem(imageComposerDraftStorageKey);
 
     await persistConversation(baseConversation);
     void runConversationQueue(conversationId);
@@ -1290,15 +1346,26 @@ function ImagePageContent({ session }: { session: StoredAuthSession }) {
                   </div>
                 </div>
               </div>
-              <label className="relative w-full md:max-w-[320px]">
-                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-stone-400" />
-                <input
-                  value={workspaceSearch}
-                  onChange={(event) => setWorkspaceSearch(event.target.value)}
-                  placeholder="搜索作品、提示词、会话"
-                  className="h-10 w-full rounded-lg border border-[var(--yan-border)] bg-white/72 pl-9 pr-3 text-sm text-stone-700 outline-none transition placeholder:text-stone-400 focus:border-rose-200 focus:bg-white focus:ring-4 focus:ring-rose-100/60"
-                />
-              </label>
+              <div className="flex w-full flex-wrap items-center gap-2 md:w-auto">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-8 shrink-0 rounded-lg border-rose-100 bg-white/75 px-2.5 text-xs text-stone-700 shadow-sm"
+                  onClick={() => setImageGuideReplaySignal((signal) => signal + 1)}
+                >
+                  <HelpCircle className="size-3.5" />
+                  新手引导
+                </Button>
+                <label className="relative min-w-[220px] flex-1 md:w-[320px] md:flex-none">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-stone-400" />
+                  <input
+                    value={workspaceSearch}
+                    onChange={(event) => setWorkspaceSearch(event.target.value)}
+                    placeholder="搜索作品、提示词、会话"
+                    className="h-10 w-full rounded-lg border border-[var(--yan-border)] bg-white/72 pl-9 pr-3 text-sm text-stone-700 outline-none transition placeholder:text-stone-400 focus:border-rose-200 focus:bg-white focus:ring-4 focus:ring-rose-100/60"
+                  />
+                </label>
+              </div>
             </div>
           </header>
 
@@ -1376,6 +1443,13 @@ function ImagePageContent({ session }: { session: StoredAuthSession }) {
         open={lightboxOpen}
         onOpenChange={setLightboxOpen}
         onIndexChange={setLightboxIndex}
+      />
+
+      <ImageOnboardingGuide
+        ownerKey={imageConversationOwnerKey}
+        mode={imageMode}
+        autoStartReady={!isLoadingHistory && activeTaskCount === 0}
+        replaySignal={imageGuideReplaySignal}
       />
 
       {deleteConfirm ? (

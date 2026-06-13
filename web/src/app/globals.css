@@ -195,4 +195,24 @@
   .hide-scrollbar::-webkit-scrollbar {
     display: none;
   }
+
+  [data-guide-target] {
+    scroll-margin: 96px;
+  }
+
+  [data-guide-active="true"] {
+    position: relative;
+    z-index: 70;
+    outline: 3px solid rgba(231, 117, 143, 0.72);
+    outline-offset: 4px;
+    box-shadow: 0 0 0 8px rgba(231, 117, 143, 0.12);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    [data-guide-active="true"],
+    [role="dialog"][aria-describedby="image-guide-body"] {
+      transition: none !important;
+      animation: none !important;
+    }
+  }
 }
